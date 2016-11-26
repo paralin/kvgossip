@@ -1,7 +1,7 @@
 K/V Gossip: Distributed Configuration
 ===================================
 
-Distributed key/value store on top of Serf, using X.509 certificates for authentication.
+Distributed key/value store on top of Serf, using a similar mechanism to X.509 certificates for authentication.
 
 Key-Value Gossip is a mechanism for maintaining a key/value tree of arbitrary data. Each key + value pair is signed by an **entity** authorized to modify it. Entities can make changes to streams by minting a new value and broadcasting the K/V pair over the network.
 
@@ -9,7 +9,32 @@ K/V entries are timestamped, and newer timestamps always take precedence over ol
 
 A K/V entry can never be truly deleted, as a tombstone must remain to prevent old values from being re-gossiped and re-introduced to the system. A tombstone is a K/V pair with no value.
 
-KVGossip keeps multiple k/v trees, which is useful if you want to avoid collisions. The tree ID is a single byte (255 tree limit). 0 is reserved for authentication storage.
+Authorization
+=============
+
+An authorization "grant" is an object signed by an entity that grants permission to another entity to edit a set of keys.
+
+Grants can be regular expressions: `/fusebot.io/r/np1/*`, `/fusebot.io/r/*/devices/*/autopilot/target_state`. Grants have an associated tree number.
+
+A grant has an identifier, which is just a hash of the grant object, which contains:
+
+ - Grant regex: `/fusebot.io/r/np1/*`
+ - Flags (see below)
+
+Grants form a tree of permissions. The root node in the tree is always the hardcoded "authority" key, like a Certificate Authority in the X.509 system.
+
+Grants can have a set of flags:
+
+ - Expiration timestamp: latest time the grant is valid.
+ - Subgrant permission: is the grant allowed to issue sub-grants?
+
+At runtime, the system loads in all of the grants it has available. It then builds a graph of currently valid grants. No grant can ever point to the root key. The system then grabs the root key, forming a tree with the root node as the authority key. Later on, when attempting to edit something, the system computes the shortest possible grant chain that will allow an edit, and uses this chain to make an edit.
+
+Grants may only give permission to edit more restrictive subsets of themselves.
+
+Grant revocations are synced globally, while grants themselves are lazy synced.
+
+When a key is changed, in the sync session between two nodes, when a key is changed, the node with the newer key provides both the new value and the grant chain that authorizes it. If the other node has a revocation that prevents accepting this change, it replies with the revocation. In this way the two are synced.
 
 Synchronization
 ===============
@@ -27,8 +52,6 @@ We use these tools to do the following operations:
 
 When we first start up, or first join, we send a full state query. This could also happen periodically.
 
-The system refuses to synchronize anything until it is certain tree 0 is synced. This is important - authorization info should be synced first, so we don't accidentally reject or accept incoming k/v changes.
-
 If we know a key or multiple keys are out of date, we can emit a state query. We then can select nodes that have a different tree hash than us, and in the order of network coordinate distance, open up a sync session with them. We do this over and over until nobody disagrees with state.
 
 A sync session is a connection in which two nodes synchronize out-of-date keys, agreeing on the latest valid keys on either side.
@@ -41,6 +64,13 @@ Sync Sessions
 A sync session starts when a node that believes it has old data connects to a node that may have new data. The following is a typical conversation:
 
 A connects to B:
+
+Grant synch step:
+
+ - A: my grant tree hash is ABCD
+ - B: my grant tree hash is DEFG ...
+
+Then key synchronization starts:
 
  - A: my overall tree hash is ABCD...
  - B: my overall tree hash is DEFG... (if they agree, they will disconnect here.)
@@ -70,9 +100,11 @@ Or otherwise (if there's a disagreement):
  - B: mine is different, timestamp is 1000
  - A: yours is newer, please send yours.
  - B: here is mine
- - A: I disagree, that looks invalid.
+ - A: I disagree, here's the revocation to prove it. Also, here's my version of the key (or null if not exists).
 
-In this case the nodes will continue on to other keys that may be out of sync, but will never re-start the process in the same sync session.
+In this case the nodes will continue on to other keys that may be out of sync, but will never re-start the process in the same sync session (unless the grant was valid).
+
+In the case that the nodes enter an infinite loop of disagreement, there is a built in maximum loop count for a sync session (3 on default) after which it will terminate the session and move on to another node.
 
 Local Database
 ==============
