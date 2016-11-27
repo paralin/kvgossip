@@ -32,3 +32,11 @@ func ParsePublicKey(data []byte) (*rsa.PublicKey, error) {
 func ComparePublicKey(k1 *rsa.PublicKey, k2 *rsa.PublicKey) bool {
 	return k1.E == k2.E && k1.N.Cmp(k2.N) == 0
 }
+
+func ComparePublicKeyIB(k1 *rsa.PublicKey, k2b []byte) bool {
+	k2, err := ParsePublicKey(k2b)
+	if err != nil {
+		return false
+	}
+	return ComparePublicKey(k1, k2)
+}

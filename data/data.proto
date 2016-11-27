@@ -5,7 +5,6 @@ message SignedData {
   SignedDataType body_type = 1;
   bytes body = 2;
   bytes signature = 3;
-  bytes public_key = 4;
 
   enum SignedDataType {
     SIGNED_GRANT = 0;

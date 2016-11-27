@@ -13,6 +13,8 @@ message Grant {
   int64 issue_timestamp = 3;
   // Public key of the issuee
   bytes issuee_key = 4;
+  // Public key of the issuer
+  bytes issuer_key = 5;
 }
 
 message GrantRevocation {
