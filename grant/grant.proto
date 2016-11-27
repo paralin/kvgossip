@@ -1,0 +1,28 @@
+syntax = "proto3";
+package grant;
+
+import "github.com/fuserobotics/kvgossip/data/data.proto";
+
+// The actual grant body.
+message Grant {
+  // Regex of allowed keys to change.
+  string key_regex = 1;
+  // Do we allow this issuee to grant subgrants of this regex?
+  bool subgrant_allowed = 2;
+  // Timestamp we issued this grant.
+  int64 issue_timestamp = 3;
+  // Public key of the issuee
+  bytes issuee_key = 4;
+}
+
+message GrantRevocation {
+  // Timestamp of revocation.
+  int64 revoke_timestamp = 1;
+  // Original grant data
+  data.SignedData grant = 2;
+}
+
+message GrantAuthorizationPool {
+  // All grants that should sum up to the intended operation.
+  repeated data.SignedData signed_grants = 1;
+}

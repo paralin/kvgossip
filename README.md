@@ -14,6 +14,8 @@ Authorization
 
 An authorization "grant" is an object signed by an entity that grants permission to another entity to edit a set of keys.
 
+All grant chains begin at the root key. There is a single root key given to KVGossip in any case.
+
 Grants can be regular expressions: `/fusebot.io/r/np1/*`, `/fusebot.io/r/*/devices/*/autopilot/target_state`. Grants have an associated tree number.
 
 A grant has an identifier, which is just a hash of the grant object, which contains:
@@ -25,7 +27,6 @@ Grants form a tree of permissions. The root node in the tree is always the hardc
 
 Grants can have a set of flags:
 
- - Expiration timestamp: latest time the grant is valid.
  - Subgrant permission: is the grant allowed to issue sub-grants?
 
 At runtime, the system loads in all of the grants it has available. It then builds a graph of currently valid grants. No grant can ever point to the root key. The system then grabs the root key, forming a tree with the root node as the authority key. Later on, when attempting to edit something, the system computes the shortest possible grant chain that will allow an edit, and uses this chain to make an edit.
@@ -117,3 +118,28 @@ We need to store the following things:
  - KV hash trees of peers.
 
 Using boltdb for this.
+
+We store for each key in the DB, the original message we received with the value, which contains:
+
+ - Value data
+ - Set verification object, which contains:
+  - key
+  - Signature of hash of value data
+  - Public key of entity that performed the action
+  - Pool of Signed Grant objects from which chains can be built to verify the action.
+
+This is also the exact object we transmit when we sync in a sync session.
+
+We store the data in two places. We store the value itself in one entry, and the verification / hash data in another.
+
+Grant Revocation
+================
+
+When a grant is revoked, everyone in the network that knows about the revocation will no longer accept any new OR OLD values that were authorized by that grant. This means that the system will converge first to null, and then to the oldest valid change to the key still remaining somewhere in the network, if such an entry exists.
+
+The safest way to revoke a grant is to take the following steps simultaneously:
+
+ - For every key that would become null following the revocation, transmit a new SET operation overwriting the key with identical data.
+ - Transmit the revocation
+
+Some nodes may set the key to null if they get the revocation before the new set operation... But applications should handle this possibility.

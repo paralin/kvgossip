@@ -1,0 +1,26 @@
+syntax = "proto3";
+package tx;
+
+import "github.com/fuserobotics/kvgossip/grant/grant.proto";
+
+// A transaction.
+message Transaction {
+  string key = 1;
+  bytes value = 2;
+
+  TransactionVerification verification = 3;
+  TransactionType transaction_type = 4;
+
+  enum TransactionType {
+    TRANSACTION_SET = 0;
+  }
+}
+
+message TransactionVerification {
+  // Signature of the value
+  bytes value_signature = 1;
+  // Public key of the signer.
+  bytes signer_public_key = 2;
+  // Grant authorization
+  grant.GrantAuthorizationPool grant = 3;
+}

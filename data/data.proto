@@ -1,0 +1,15 @@
+syntax = "proto3";
+package data;
+
+message SignedData {
+  SignedDataType body_type = 1;
+  bytes body = 2;
+  bytes signature = 3;
+  bytes public_key = 4;
+
+  enum SignedDataType {
+    SIGNED_GRANT = 0;
+    SIGNED_GRANT_REVOCATION = 2;
+    SIGNED_TRANSACTION = 3;
+  }
+}
