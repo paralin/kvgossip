@@ -1,12 +1,13 @@
 package grant
 
-import "path"
+import (
+	kp "github.com/fuserobotics/kvgossip/key"
+)
 
 // ValidateKeyAuthorization checks if a chain of grants permit access to a key.
 func ValidateKeyAuthorization(grantChain []*Grant, key string) bool {
 	for _, grant := range grantChain {
-		matched, err := path.Match(grant.KeyRegex, key)
-		if err != nil || !matched {
+		if !kp.KeyPatternContains(grant.KeyRegex, key) {
 			return false
 		}
 	}

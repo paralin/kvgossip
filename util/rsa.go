@@ -40,3 +40,7 @@ func ComparePublicKeyIB(k1 *rsa.PublicKey, k2b []byte) bool {
 	}
 	return ComparePublicKey(k1, k2)
 }
+
+func MarshalPublicKey(k *rsa.PublicKey) ([]byte, error) {
+	return x509.MarshalPKIXPublicKey(k)
+}

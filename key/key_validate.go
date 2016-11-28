@@ -8,3 +8,9 @@ func ValidatePattern(pattern string) error {
 	_, err := path.Match(pattern, "/")
 	return err
 }
+
+// KeyPatternContains checks if the pattern contains the key.
+func KeyPatternContains(pattern, key string) bool {
+	matched, err := path.Match(pattern, key)
+	return err == nil && matched
+}

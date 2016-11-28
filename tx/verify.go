@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/fuserobotics/kvgossip/grant"
+	"github.com/fuserobotics/kvgossip/key"
 	"github.com/fuserobotics/kvgossip/util"
 )
 
@@ -98,5 +99,5 @@ func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, pool *gr
 
 // SatisfiedBy checks if a grant could have issued a transaction.
 func (trx *Transaction) SatisfiedBy(gra *grant.Grant) bool {
-	return gra.RegexContains(trx.Key)
+	return key.KeyPatternContains(gra.KeyRegex, trx.Key)
 }
