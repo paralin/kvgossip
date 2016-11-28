@@ -143,3 +143,18 @@ The safest way to revoke a grant is to take the following steps simultaneously:
  - Transmit the revocation
 
 Some nodes may set the key to null if they get the revocation before the new set operation... But applications should handle this possibility.
+
+Verify Step
+===========
+
+When a grant is revoked, we must iterate through all the key/value metadata objects, and delete any revoked grants from their grant pools. Next, the grant authorization should be verified again. If the verification now comes back as unsatisfied, we should unset the field completely.
+
+Key Rules
+=========
+
+Keys are made up of slash separated segments, like paths.
+
+Examples:
+
+ - `/fusebot.io/r/np1/devices/**/*`
+ - `/fusebot.io/r/np1/devices/*/*`

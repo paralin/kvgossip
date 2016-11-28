@@ -1,6 +1,9 @@
 package grant
 
-import "bytes"
+import (
+	"bytes"
+	"github.com/fuserobotics/kvgossip/key"
+)
 
 // ValidGrants returns a slice of only the valid intermediates from a chain.
 func (c *GrantAuthorizationPool) ValidGrants() []*ValidGrantData {
@@ -15,23 +18,18 @@ func (c *GrantAuthorizationPool) ValidGrants() []*ValidGrantData {
 	return res
 }
 
-// Check if the key regex is valid
-func (c *Grant) RegexContains(other string) bool {
-	// TODO
-	return false
-}
-
 // SatisfiesGrant checks if a grant could have issued another grant.
 func (c *Grant) SatisfiesGrant(gra *Grant) bool {
-	// TODO: complete this
 	return c.SubgrantAllowed &&
-		bytes.Compare(gra.IssuerKey, c.IssueeKey) == 0 &&
-		c.RegexContains(gra.KeyRegex)
+		bytes.Compare(gra.IssuerKey, c.IssueeKey) == 0
 }
 
 // Verify the grant is valid.
 func (g *Grant) Validate() error {
-	// TODO
+	// TODO check other things... issuer / issuee keys, for example.
+	if err := key.ValidatePattern(g.KeyRegex); err != nil {
+		return err
+	}
 	return nil
 }
 
