@@ -66,46 +66,29 @@ A sync session starts when a node that believes it has old data connects to a no
 
 A connects to B:
 
-Grant synch step:
-
- - A: my grant tree hash is ABCD
- - B: my grant tree hash is DEFG ...
-
-Then key synchronization starts:
+Key synchronization starts:
 
  - A: my overall tree hash is ABCD...
- - B: my overall tree hash is DEFG... (if they agree, they will disconnect here.)
+ - B: my overall tree hash is DEFG... (if they agree, B will disconnect here)
 
 Foreach key in A, in order of newest changed -> oldest changed:
 
  - A: my hash of key H is DEFG
  - B: ok
 
-Until eventually...
-
- - A: my hash of key J is FFFA
- - B: mine is different, timestamp is 1000
- - A: mine is newer, here it is (timestamp + key + value bundle).
-
-OR
-
- - A: my hash of key J is FFFA
- - B: mine is different, timestamp is 1000
- - A: yours is newer, please send yours.
- - B: here is mine
- - A: my overall tree hash is ABCD (process restarts...)
-
-Or otherwise (if there's a disagreement):
-
- - A: my hash of key J is FFFA
- - B: mine is different, timestamp is 1000
- - A: yours is newer, please send yours.
- - B: here is mine
- - A: I disagree, here's the revocation to prove it. Also, here's my version of the key (or null if not exists).
-
-In this case the nodes will continue on to other keys that may be out of sync, but will never re-start the process in the same sync session (unless the grant was valid).
-
 In the case that the nodes enter an infinite loop of disagreement, there is a built in maximum loop count for a sync session (3 on default) after which it will terminate the session and move on to another node.
+
+The "overall tree hash" is derived by:
+
+ - Iterate over the hashes in byte-sorted order (Bolt does this.)
+ - For each hash, xor the entire hash by the index, and add this to a buffer.
+ - Sha256 that buffer.
+
+One flaw with this is that in the best case a conversation will be the size of (key + global tree hash + value + key hash), and worst case will be many keys + hashes (something like 140kb of data).
+
+140kb is not that much, but it could probably be reduced somehow.
+
+Timeouts are quick - 1 second max between messages, increased to 15 seconds during a value transfer.
 
 Local Database
 ==============

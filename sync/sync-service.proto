@@ -1,0 +1,48 @@
+syntax = "proto3";
+package sync;
+
+import "github.com/fuserobotics/kvgossip/sync/sync.proto";
+import "github.com/fuserobotics/kvgossip/tx/transaction.proto";
+import "github.com/fuserobotics/kvgossip/data/data.proto";
+
+// Offer our global tree hash.
+message SyncGlobalHash {
+  string kvgossip_version = 1;
+  bytes global_tree_hash = 2;
+}
+
+// Offer our local hash for a key.
+// Response will be a 1 in the timestamp field for agreement.
+message SyncKeyHash {
+  string key = 1;
+  bytes hash = 2;
+  int64 timestamp = 3;
+}
+
+// Response to SyncKeyHash disagreement.
+// request_key will be set to the key if we want the peer's value.
+// Otherwise, transaction will be set to OUR value.
+message SyncKey {
+  string request_key = 1;
+  tx.Transaction transaction = 2;
+}
+
+// Response to SyncKey.
+message SyncKeyResult {
+  // If we are rejecting the sync, return the relevant revocations.
+  repeated data.SignedData revocations = 1;
+  // Otherwise, just echo back the key.
+  string updated_key = 2;
+}
+
+// A message in a sync session conversation.
+message SyncSessionMessage {
+  SyncGlobalHash sync_global_hash = 1;
+  SyncKeyHash sync_key_hash = 2;
+  SyncKey sync_key = 3;
+  SyncKeyResult sync_key_result = 4;
+}
+
+service SyncService {
+  rpc SyncSession(stream SyncSessionMessage) returns (stream SyncSessionMessage) {}
+}

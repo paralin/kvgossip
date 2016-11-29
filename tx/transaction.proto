@@ -16,11 +16,16 @@ message Transaction {
   }
 }
 
+message TransactionValue {
+}
+
 message TransactionVerification {
-  // Signature of the value
+  // Signature of the value object + timestamp (64 bit network order)
   bytes value_signature = 1;
   // Public key of the signer.
   bytes signer_public_key = 2;
   // Grant authorization
   grant.GrantAuthorizationPool grant = 3;
+  // Timestamp
+  int64 timestamp = 4;
 }
