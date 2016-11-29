@@ -3,10 +3,13 @@ package main
 import (
 	"os"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 func main() {
+	log.SetLevel(log.DebugLevel)
+
 	app := cli.NewApp()
 	app.Name = "kvgossip"
 	app.EnableBashCompletion = true

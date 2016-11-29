@@ -6,6 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/fuserobotics/kvgossip/db"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -46,6 +47,22 @@ func (sm *SyncManager) SetServerDisabled(disabled bool) {
 	sm.serverDisabled = disabled
 }
 
+func (sm *SyncManager) Connect(peer string) error {
+	conn, err := grpc.Dial(peer, grpc.WithInsecure())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	client := NewSyncServiceClient(conn)
+	ss := NewSyncSession(sm.db, true)
+	sm.startSyncSession(ss)
+	stream, err := client.SyncSession(context.Background())
+	if err != nil {
+		return err
+	}
+	return ss.SyncSession(stream)
+}
+
 func (sm *SyncManager) startSyncSession(ss *SyncSession) {
 	sm.sessionIdCounter++
 	id := sm.sessionIdCounter
@@ -64,6 +81,10 @@ func (sm *SyncManager) syncLoop() {
 
 	grpcServer := grpc.NewServer()
 	RegisterSyncServiceServer(grpcServer, sm)
+
+	if sm.syncServicePort <= 0 {
+		sm.serverDisabled = true
+	}
 	if !sm.serverDisabled {
 		go func() {
 			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", sm.syncServicePort))

@@ -1,6 +1,7 @@
 package main
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -13,7 +14,11 @@ func runManualSync(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	return ag.SyncOnce(ManualSyncFlags.Peer)
+	err = ag.SyncOnce(ManualSyncFlags.Peer)
+	if err != nil {
+		log.Errorf("Error syncing: %v", err)
+	}
+	return err
 }
 
 var ManualSyncCommand cli.Command = cli.Command{

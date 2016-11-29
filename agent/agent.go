@@ -43,5 +43,9 @@ func (a *Agent) Run() error {
 
 func (a *Agent) SyncOnce(peer string) error {
 	log.Infof("Attempting sync with %s...", peer)
-	return nil
+	a.SyncManager.Start()
+	defer func() {
+		a.SyncManager.Stop()
+	}()
+	return a.SyncManager.Connect(peer)
 }
