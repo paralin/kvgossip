@@ -1,7 +1,6 @@
 syntax = "proto3";
 package sync;
 
-import "github.com/fuserobotics/kvgossip/sync/sync.proto";
 import "github.com/fuserobotics/kvgossip/tx/transaction.proto";
 import "github.com/fuserobotics/kvgossip/data/data.proto";
 
