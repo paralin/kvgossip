@@ -11,11 +11,11 @@ message SyncGlobalHash {
   string host_nonce = 3;
 }
 
-// Offer our local signature for a key.
+// Offer our local hash for a key.
 // Response will be a 1 in the timestamp field for agreement.
 message SyncKeyHash {
   string key = 1;
-  bytes signature = 2;
+  bytes hash = 2;
   uint64 timestamp = 3;
 }
 

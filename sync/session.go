@@ -106,9 +106,10 @@ func (ss *SyncSession) runSyncSession() error {
 	// Iterate through our local keys and attempt to compare them.
 	err = ss.DB.DB.View(func(readTransaction *bolt.Tx) error {
 		return ss.DB.ForeachKeyVerification(readTransaction, func(k string, v *tx.TransactionVerification) error {
+			hash := ss.DB.GetKeyHash(readTransaction, k)
 			err := ss.Stream.Send(&SyncSessionMessage{
 				SyncKeyHash: &SyncKeyHash{
-					Signature: v.ValueSignature,
+					Hash:      hash,
 					Key:       k,
 					Timestamp: v.Timestamp,
 				},
@@ -363,9 +364,9 @@ func (ss *SyncSession) handleMessage(msg *SyncSessionMessage) error {
 		if _, ok := ss.State.RemoteKeyHashes[skh.Key]; ok {
 			return errors.New("Received key twice (not allowed).")
 		}
-		ss.State.RemoteKeyHashes[skh.Key] = skh.Signature
-		if len(skh.Signature) != 32 {
-			return errors.New("Signature length not 32, invalid.")
+		ss.State.RemoteKeyHashes[skh.Key] = skh.Hash
+		if len(skh.Hash) != 32 {
+			return errors.New("Hash length not 32, invalid.")
 		}
 		var localSig []byte
 		ss.DB.DB.View(func(tx *bolt.Tx) error {
@@ -378,7 +379,7 @@ func (ss *SyncSession) handleMessage(msg *SyncSessionMessage) error {
 			if err := ss.requestRemoteKey(skh.Key); err != nil {
 				return err
 			}
-		} else if bytes.Compare(localSig, skh.Signature) == 0 {
+		} else if bytes.Compare(localSig, skh.Hash) == 0 {
 			// We agree, send a agreement.
 			return ss.agreeRemoteKey(skh.Key)
 		} else {
