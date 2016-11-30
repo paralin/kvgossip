@@ -24,6 +24,10 @@ func (kvg *KVGossipDB) GetGlobalBucket(tx *bolt.Tx) *bolt.Bucket {
 	return GetOrEnsureBucket(tx, []byte("global"))
 }
 
+func (kvg *KVGossipDB) GetGrantBucket(tx *bolt.Tx) *bolt.Bucket {
+	return GetOrEnsureBucket(tx, []byte("grants"))
+}
+
 func (kvg *KVGossipDB) ensureBuckets() error {
 	return kvg.DB.Update(func(tx *bolt.Tx) error {
 		kvg.GetDataBucket(tx)
@@ -31,6 +35,7 @@ func (kvg *KVGossipDB) ensureBuckets() error {
 		kvg.GetRevocationBucket(tx)
 		kvg.GetDataHashBucket(tx)
 		kvg.GetGlobalBucket(tx)
+		kvg.GetGrantBucket(tx)
 		return nil
 	})
 }

@@ -162,7 +162,7 @@ func (ss *SyncSession) runSyncSession() error {
 
 func (ss *SyncSession) handleIncomingTransaction(trans *tx.Transaction, sk *SyncKey) (*SyncKeyResult, error) {
 	// validate
-	res := tx.VerifyGrantAuthorization(trans, ss.RootKey, sk.Transaction.Verification.Grant, ss.DB)
+	res := tx.VerifyGrantAuthorization(trans, ss.RootKey, ss.DB)
 	syncKeyResult := &SyncKeyResult{
 		Revocations: res.Revocations,
 		UpdatedKey:  trans.Key,
@@ -316,6 +316,7 @@ func (ss *SyncSession) handleMessage(msg *SyncSessionMessage) error {
 	if err := ss.assertGlobalHash(msg); err != nil {
 		return err
 	}
+	// TODO: handle sync key, etc.
 	return nil
 }
 
@@ -346,9 +347,12 @@ func (ss *SyncSession) SyncSession(stream SyncSessionStream) error {
 	}()
 
 	if ss.Initiator {
-		err := ss.runSyncSession()
-		if err != nil && ss.Error == nil {
-			ss.Error = err
+		for ss.Error == nil && !ss.DisconnectNow && ss.State.SyncSpinCount < MaxSyncSpinCount {
+			err := ss.runSyncSession()
+			if err != nil && ss.Error == nil {
+				ss.Error = err
+			}
+			ss.State.SyncSpinCount++
 		}
 	} else {
 		// If we're not the initiator, wait for messages.

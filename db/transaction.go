@@ -7,6 +7,10 @@ import (
 
 func (db *KVGossipDB) ApplyTransaction(trans *tx.Transaction) error {
 	return db.DB.Update(func(tx *bolt.Tx) error {
+		// Put all the valid grants
+		for _, grant := range trans.Verification.Grant.SignedGrants {
+			db.PutGrant(grant)
+		}
 		// Update key hash
 		if err := db.UpdateKeyHash(tx, trans.Key, trans.Value); err != nil {
 			return err

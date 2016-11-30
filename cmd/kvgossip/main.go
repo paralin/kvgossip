@@ -19,6 +19,7 @@ func main() {
 		AgentCommand,
 		ManualSyncCommand,
 		KeyGenCommand,
+		ControlCommand,
 	}
 	app.Flags = []cli.Flag{
 		cli.StringFlag{

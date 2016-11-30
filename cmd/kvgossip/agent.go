@@ -11,10 +11,11 @@ import (
 )
 
 var AgentFlags struct {
-	DbPath          string
-	SyncServicePort int
-	RootKeyPath     string
-	RootKey         *rsa.PublicKey
+	DbPath             string
+	SyncServicePort    int
+	ControlServicePort string
+	RootKeyPath        string
+	RootKey            *rsa.PublicKey
 }
 
 func loadRootKey() error {
@@ -36,7 +37,7 @@ func buildAgent() (*agent.Agent, error) {
 		return nil, err
 	}
 	log.Infof("Attempting to open DB %s...", AgentFlags.DbPath)
-	ag, err := agent.NewAgent(AgentFlags.DbPath, AgentFlags.SyncServicePort, AgentFlags.RootKey)
+	ag, err := agent.NewAgent(AgentFlags.DbPath, AgentFlags.SyncServicePort, AgentFlags.ControlServicePort, AgentFlags.RootKey)
 	if err != nil {
 		log.Errorf("Error opening db: %v", err)
 	}
@@ -61,6 +62,12 @@ var AgentCommand cli.Command = cli.Command{
 			Usage:       "Start sync service on `PORT`.",
 			Value:       9021,
 			Destination: &AgentFlags.SyncServicePort,
+		},
+		cli.StringFlag{
+			Name:        "ctlport, c",
+			Usage:       "Start control service on `PORT`.",
+			Value:       "localhost:9022",
+			Destination: &AgentFlags.ControlServicePort,
 		},
 	},
 }

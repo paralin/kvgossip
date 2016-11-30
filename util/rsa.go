@@ -29,6 +29,15 @@ func ParsePublicKey(data []byte) (*rsa.PublicKey, error) {
 	}
 }
 
+func ParsePrivateKey(data []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, PemDecodeErr
+	}
+
+	return x509.ParsePKCS1PrivateKey(block.Bytes)
+}
+
 func ComparePublicKey(k1 *rsa.PublicKey, k2 *rsa.PublicKey) bool {
 	return k1.E == k2.E && k1.N.Cmp(k2.N) == 0
 }
@@ -42,5 +51,13 @@ func ComparePublicKeyIB(k1 *rsa.PublicKey, k2b []byte) bool {
 }
 
 func MarshalPublicKey(k *rsa.PublicKey) ([]byte, error) {
-	return x509.MarshalPKIXPublicKey(k)
+	data, err := x509.MarshalPKIXPublicKey(k)
+	if err != nil {
+		return nil, err
+	}
+	blk := pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: data,
+	}
+	return pem.EncodeToMemory(&blk), nil
 }

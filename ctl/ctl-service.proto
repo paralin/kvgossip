@@ -1,0 +1,32 @@
+syntax = "proto3";
+package ctl;
+
+import "github.com/fuserobotics/kvgossip/data/data.proto";
+import "github.com/fuserobotics/kvgossip/tx/transaction.proto";
+import "github.com/fuserobotics/kvgossip/grant/grant.proto";
+
+// Store a new grant in the DB
+message PutGrantRequest {
+  grant.GrantAuthorizationPool pool = 1;
+}
+
+message PutGrantResponse {
+  repeated data.SignedData revocations = 1;
+}
+
+// Request a pool of grants that would satisfy a request.
+message GetGrantPoolRequest {
+  bytes entity_public_key = 1;
+  string key = 2;
+}
+
+message GetGrantPoolResponse {
+  tx.Transaction transaction = 1;
+  repeated data.SignedData revocations = 2;
+  repeated data.SignedData invalid = 3;
+}
+
+service ControlService {
+  rpc PutGrant(PutGrantRequest) returns (PutGrantResponse) {}
+  rpc GetGrantPool(GetGrantPoolRequest) returns (GetGrantPoolResponse) {}
+}

@@ -47,6 +47,7 @@ func SignGrant(grant *Grant, issuerKey *rsa.PrivateKey) (*data.SignedData, error
 	if err := grant.Validate(); err != nil {
 		return nil, err
 	}
+
 	if !util.ComparePublicKeyIB(&issuerKey.PublicKey, grant.IssuerKey) {
 		return nil, errors.New("Signer key and issuer key do not match.")
 	}

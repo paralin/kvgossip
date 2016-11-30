@@ -7,19 +7,22 @@ import (
 	"syscall"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/fuserobotics/kvgossip/ctl"
 	"github.com/fuserobotics/kvgossip/db"
 	"github.com/fuserobotics/kvgossip/sync"
 )
 
 type Agent struct {
-	DB              *db.KVGossipDB
-	SyncManager     *sync.SyncManager
-	SyncServicePort int
-	RootKey         *rsa.PublicKey
+	DB                *db.KVGossipDB
+	SyncManager       *sync.SyncManager
+	ControlServer     *ctl.CtlServer
+	ControlServerPort string
+	SyncServicePort   int
+	RootKey           *rsa.PublicKey
 }
 
-func NewAgent(dbPath string, syncServicePort int, rootKey *rsa.PublicKey) (*Agent, error) {
-	res := &Agent{SyncServicePort: syncServicePort}
+func NewAgent(dbPath string, syncServicePort int, controlServicePort string, rootKey *rsa.PublicKey) (*Agent, error) {
+	res := &Agent{SyncServicePort: syncServicePort, ControlServerPort: controlServicePort}
 	d, err := db.OpenDB(dbPath)
 	if err != nil {
 		return nil, err
@@ -27,12 +30,14 @@ func NewAgent(dbPath string, syncServicePort int, rootKey *rsa.PublicKey) (*Agen
 	res.DB = d
 	res.RootKey = rootKey
 	res.SyncManager = sync.NewSyncManager(d, syncServicePort, rootKey)
+	res.ControlServer = ctl.NewCtlServer(d, rootKey)
 	return res, nil
 }
 
 func (a *Agent) Run() error {
 	log.Info("DB ok, agent starting up...")
 	a.SyncManager.Start()
+	a.ControlServer.Start(a.ControlServerPort)
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -40,6 +45,7 @@ func (a *Agent) Run() error {
 
 	log.Info("Ctrl-c caught, shutting down...")
 	a.SyncManager.Stop()
+	a.ControlServer.Stop()
 
 	return nil
 }

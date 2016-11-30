@@ -141,3 +141,19 @@ Examples:
 
  - `/fusebot.io/r/np1/devices/**/*`
  - `/fusebot.io/r/np1/devices/*/*`
+
+Grant Storage
+=============
+
+Every time an app or user wants to set a key, it has to pass a transaction, which is a key, value, signature of the value, and public key used to make the signature.
+
+The question is who stores the grant objects. Grants are bundled with the set transactions when they go out, so there's no particular reason to store them in kvgossip aside from convenience. At the same time, if kvgossip has a pool of grants stored locally, it can build the chains itself.
+
+To solve this problem, we store a local database of every grant we have ever observed. When we get a new pool of grants (in a transaction or otherwise), we do the following:
+
+Foreach grant:
+
+ - Check if grant is revoked (if so, skip it)
+ - Place the grant into the DB with sha256 as key.
+
+When we put a revocation, we delete the grant out of this pool.

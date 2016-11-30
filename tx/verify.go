@@ -79,11 +79,12 @@ type VerifyGrantAuthorizationResult struct {
 // Verify attempts to find chains of grants from the list of signed grants
 // which enable the requested action to the performed. The chains will have
 // the root key as the first element, always, and the actor key as the last element.
-func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, pool *grant.GrantAuthorizationPool, revocationChecker grant.RevocationChecker) *VerifyGrantAuthorizationResult {
-	if root == nil || pool == nil || target == nil {
+func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, revocationChecker grant.RevocationChecker) *VerifyGrantAuthorizationResult {
+	if root == nil || target == nil {
 		return nil
 	}
 
+	pool := target.Verification.Grant
 	valid, revocations, invalid := pool.ValidGrants(true, revocationChecker)
 	grants := valid
 	rootGrant := &grant.ValidGrantData{PublicKey: root}

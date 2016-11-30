@@ -15,6 +15,7 @@ import (
 )
 
 var NoValidRevocationErr error = errors.New("Revocation data did not contain a valid revocation.")
+var NoValidGrantErr error = errors.New("Grant data did not contain a valid grant.")
 
 // Check for a revocation. grantData is the encoded body of the signed grant.
 func (kvg *KVGossipDB) GetRevocation(grantData []byte) (dr *dn.SignedData) {
@@ -91,13 +92,64 @@ func (kvg *KVGossipDB) ApplyRevocation(sd *dn.SignedData) error {
 			}
 		}
 
+		// Delete the grant if it exists in the pool.
+		key := util.HexSha256(rev.Grant.Body)
+
+		grantBkt := kvg.GetGrantBucket(tx)
+		grantBkt.Delete([]byte(key))
+
 		// Put the new revocation.
 		bkt := kvg.GetRevocationBucket(tx)
-		key := util.HexSha256(rev.Grant.Body)
 		bd, err := proto.Marshal(sd)
 		if err != nil {
 			return err
 		}
 		return bkt.Put([]byte(key), bd)
 	})
+}
+
+func (kvg *KVGossipDB) PutGrant(sd *dn.SignedData) error {
+	if sd.BodyType != dn.SignedData_SIGNED_GRANT {
+		return NoValidGrantErr
+	}
+	vgd, err := grant.ValidateGrantData(sd)
+	if err != nil {
+		return err
+	}
+	if vgd.Grant == nil {
+		return NoValidGrantErr
+	}
+
+	key := util.HexSha256(sd.Body)
+	// Check if it has been revoked.
+	rev := kvg.GetRevocation(sd.Body)
+	if rev != nil {
+		return errors.New("Grant has already been revoked.")
+	}
+
+	// Insert it
+	return kvg.DB.Update(func(tx *bolt.Tx) error {
+		grantBkt := kvg.GetGrantBucket(tx)
+		sdbin, err := proto.Marshal(sd)
+		if err != nil {
+			return err
+		}
+		return grantBkt.Put([]byte(key), sdbin)
+	})
+}
+
+func (kvg *KVGossipDB) GetAllGrants() (res []*dn.SignedData) {
+	res = []*dn.SignedData{}
+	kvg.DB.View(func(tx *bolt.Tx) error {
+		grantBkt := kvg.GetGrantBucket(tx)
+		return grantBkt.ForEach(func(k, v []byte) error {
+			next := &dn.SignedData{}
+			if err := proto.Unmarshal(v, next); err != nil {
+				return nil
+			}
+			res = append(res, next)
+			return nil
+		})
+	})
+	return
 }

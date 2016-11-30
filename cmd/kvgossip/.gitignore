@@ -1,4 +1,3 @@
 kvgossip*.db
 kvgossip
-root.pem
-root_key.pem
+*.pem
