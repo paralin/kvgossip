@@ -26,7 +26,15 @@ message GetGrantPoolResponse {
   repeated data.SignedData invalid = 3;
 }
 
+message PutTransactionRequest {
+  tx.Transaction transaction = 1;
+}
+
+message PutTransactionResponse {
+}
+
 service ControlService {
   rpc PutGrant(PutGrantRequest) returns (PutGrantResponse) {}
   rpc GetGrantPool(GetGrantPoolRequest) returns (GetGrantPoolResponse) {}
+  rpc PutTransaction(PutTransactionRequest) returns (PutTransactionResponse) {}
 }

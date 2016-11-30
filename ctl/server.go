@@ -2,6 +2,7 @@ package ctl
 
 import (
 	"crypto/rsa"
+	"errors"
 	"net"
 	"time"
 
@@ -85,6 +86,26 @@ func (ct *CtlServer) PutGrant(ctx context.Context, req *PutGrantRequest) (*PutGr
 	return &PutGrantResponse{
 		Revocations: revocations,
 	}, nil
+}
+
+func (ct *CtlServer) PutTransaction(ctx context.Context, req *PutTransactionRequest) (*PutTransactionResponse, error) {
+	if req.Transaction == nil {
+		return nil, errors.New("Transaction cannot be nil.")
+	}
+	if err := req.Transaction.Validate(); err != nil {
+		return nil, err
+	}
+	res := tx.VerifyGrantAuthorization(req.Transaction, ct.RootKey, ct.DB)
+	log.Debugf("Received new value on control channel for key %s timestamp %v.",
+		req.Transaction.Key,
+		util.NumberToTime(int64(req.Transaction.Verification.Timestamp)))
+	if len(res.Chains) == 0 {
+		return nil, errors.New("No valid grants for that transaction.")
+	}
+	if err := ct.DB.ApplyTransaction(req.Transaction); err != nil {
+		return nil, err
+	}
+	return &PutTransactionResponse{}, nil
 }
 
 func (ct *CtlServer) Start(listen string) error {

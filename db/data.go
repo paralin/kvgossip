@@ -67,6 +67,13 @@ func (kvg *KVGossipDB) ForeachKeyVerification(tx *bolt.Tx, fee func(k string, v 
 	})
 }
 
+func (kvg *KVGossipDB) ForeachKeyHash(tx *bolt.Tx, fee func(k string, v []byte) error) error {
+	bkt := kvg.GetDataHashBucket(tx)
+	return bkt.ForEach(func(k, v []byte) error {
+		return fee(string(k), v)
+	})
+}
+
 func (kvg *KVGossipDB) PurgeKey(tx *bolt.Tx, key string) error {
 	// Delete metadata.
 	buckets := []*bolt.Bucket{

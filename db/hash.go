@@ -34,6 +34,8 @@ func (kvg *KVGossipDB) UpdateOverallHash(tx *bolt.Tx) error {
 
 	bkt := kvg.GetDataHashBucket(tx)
 	numKeys := bkt.Stats().KeyN
+	// we have to add 1 for the new key
+	numKeys++
 	buf := make([]byte, numKeys*32)
 
 	i := 0

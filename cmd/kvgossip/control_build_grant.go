@@ -43,6 +43,7 @@ var ControlBuildGrantCommand cli.Command = cli.Command{
 		if err := key.ValidatePattern(NewGrantFlags.GrantKey); err != nil {
 			return err
 		}
+
 		// Build the new grant.
 		ng, err := grant.BuildNewGrant(ControlFlags.Key, NewGrantFlags.Key, NewGrantFlags.GrantKey, NewGrantFlags.AllowSubgrant)
 		if err != nil {

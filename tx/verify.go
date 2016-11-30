@@ -43,12 +43,9 @@ func (vga *verifyGrantAuthorization) evaluate(curr *grant.ValidGrantData, target
 	// If we fulfill the target, we have found a chain.
 	// We fufill the target if we are the root key and the target is signed by the root key,
 	// OR we are NOT the root key and the grant satisfies the target.
-	if (curr.Grant == nil &&
-		util.ComparePublicKeyIB(curr.PublicKey, target.Verification.SignerPublicKey)) ||
-		(curr.Grant != nil &&
-			target.SatisfiedBy(curr.Grant)) {
-		path := []*grant.ValidGrantData{}
-		copy(vga.Chain, path)
+	if curr.Grant != nil && target.SatisfiedBy(curr.Grant) {
+		path := make([]*grant.ValidGrantData, len(vga.Chain)-1)
+		copy(path, vga.Chain[1:])
 		vga.Result = append(vga.Result, path)
 		return
 	}
@@ -114,7 +111,8 @@ func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, revocati
 
 // SatisfiedBy checks if a grant could have issued a transaction.
 func (trx *Transaction) SatisfiedBy(gra *grant.Grant) bool {
-	return key.KeyPatternContains(gra.KeyRegex, trx.Key)
+	sat := key.KeyPatternContains(gra.KeyRegex, trx.Key)
+	return sat
 }
 
 // Initial check of a transaction message.

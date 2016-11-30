@@ -128,7 +128,7 @@ func (kvg *KVGossipDB) PutGrant(sd *dn.SignedData) error {
 	}
 
 	// Insert it
-	return kvg.DB.Update(func(tx *bolt.Tx) error {
+	return kvg.DB.Update(func(tx *bolt.Tx) (updateErr error) {
 		grantBkt := kvg.GetGrantBucket(tx)
 		sdbin, err := proto.Marshal(sd)
 		if err != nil {

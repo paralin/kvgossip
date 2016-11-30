@@ -60,6 +60,7 @@ var ControlCommand cli.Command = cli.Command{
 	Before: loadControlStuff,
 	Subcommands: []cli.Command{
 		ControlBuildGrantCommand,
+		ControlSetKeyCommand,
 	},
 	After: func(c *cli.Context) error {
 		if ControlFlags.Connection != nil {
