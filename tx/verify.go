@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"errors"
 
+	"github.com/fuserobotics/kvgossip/data"
 	"github.com/fuserobotics/kvgossip/grant"
 	"github.com/fuserobotics/kvgossip/key"
 	"github.com/fuserobotics/kvgossip/util"
@@ -65,18 +66,23 @@ func (vga *verifyGrantAuthorization) evaluate(curr *grant.ValidGrantData, target
 	}
 }
 
+type VerifyGrantAuthorizationResult struct {
+	Chains        [][]*grant.ValidGrantData
+	ValidGrants   []*grant.ValidGrantData
+	Revocations   []*data.SignedData
+	InvalidGrants []*data.SignedData
+}
+
 // Verify attempts to find chains of grants from the list of signed grants
 // which enable the requested action to the performed. The chains will have
 // the root key as the first element, always, and the actor key as the last element.
-//
-// WARNING: this doesn't do any revocation checking. You should run the resultant
-// list of chains through checks for revocation before trusting any of the chains.
-func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, pool *grant.GrantAuthorizationPool) (chains [][]*grant.ValidGrantData, err error) {
+func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, pool *grant.GrantAuthorizationPool, revocationChecker grant.RevocationChecker) (*VerifyGrantAuthorizationResult, error) {
 	if root == nil || pool == nil || target == nil {
 		return nil, InvalidArgumentError
 	}
 
-	grants := pool.ValidGrants()
+	valid, revocations, invalid := pool.ValidGrants(true, revocationChecker)
+	grants := valid
 	rootGrant := &grant.ValidGrantData{PublicKey: root}
 
 	vga := &verifyGrantAuthorization{
@@ -94,7 +100,12 @@ func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, pool *gr
 
 	vga.evaluate(rootGrant, target)
 
-	return vga.Result, nil
+	return &VerifyGrantAuthorizationResult{
+		Chains:        vga.Result,
+		InvalidGrants: invalid,
+		ValidGrants:   valid,
+		Revocations:   revocations,
+	}, nil
 }
 
 // SatisfiedBy checks if a grant could have issued a transaction.

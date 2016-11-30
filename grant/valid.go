@@ -85,16 +85,25 @@ func ValidateGrantData(s *data.SignedData) (*ValidGrantData, error) {
 }
 
 // ValidGrants returns a slice of only the valid intermediates from a chain.
-func (c *GrantAuthorizationPool) ValidGrants() []*ValidGrantData {
-	res := []*ValidGrantData{}
+func (c *GrantAuthorizationPool) ValidGrants(cull bool, revocationChecker RevocationChecker) (valid []*ValidGrantData, revocations []*data.SignedData, invalid []*data.SignedData) {
+	valid = []*ValidGrantData{}
+	revocations = []*data.SignedData{}
+	invalid = []*data.SignedData{}
 	for _, gd := range c.GetSignedGrants() {
-		vd, err := ValidateGrantData(gd)
-		if err != nil || vd.Grant == nil {
+		revocation := revocationChecker.GetRevocation(gd.Body)
+		if revocation != nil {
+			invalid = append(invalid, gd)
+			revocations = append(revocations, revocation)
 			continue
 		}
-		res = append(res, vd)
+		vd, err := ValidateGrantData(gd)
+		if err != nil || vd.Grant == nil {
+			invalid = append(invalid, gd)
+			continue
+		}
+		valid = append(valid, vd)
 	}
-	return res
+	return
 }
 
 // SatisfiesGrant checks if a grant could have issued another grant.

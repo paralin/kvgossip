@@ -4,6 +4,7 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	ver "github.com/fuserobotics/kvgossip/version"
 	"github.com/urfave/cli"
 )
 
@@ -12,6 +13,7 @@ func main() {
 
 	app := cli.NewApp()
 	app.Name = "kvgossip"
+	app.Version = ver.KVGossipVersion
 	app.EnableBashCompletion = true
 	app.Commands = []cli.Command{
 		AgentCommand,

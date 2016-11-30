@@ -1,13 +1,24 @@
 package db
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"errors"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
+	"github.com/fuserobotics/kvgossip/util"
 )
 
 var TreeHashKeyName []byte = []byte("treeHash")
+
+func (kvg *KVGossipDB) GetKeyHash(tx *bolt.Tx, key string) []byte {
+	bkt := kvg.GetDataHashBucket(tx)
+	data := bkt.Get([]byte(key))
+	res := make([]byte, len(data))
+	copy(res, data)
+	return data
+}
 
 // Update the key hash for a key.
 func (kvg *KVGossipDB) UpdateKeyHash(tx *bolt.Tx, key string, keyData []byte) error {
@@ -40,6 +51,10 @@ func (kvg *KVGossipDB) UpdateOverallHash(tx *bolt.Tx) error {
 	}
 
 	overallHash := sha256.Sum256(buf)
+	if len(kvg.TreeHash) != 0 && bytes.Compare(overallHash[:], kvg.TreeHash) != 0 {
+		log.Infof("Overall tree hash updated -> %s", util.HashToString(overallHash[:]))
+	}
+
 	gbkt := kvg.GetGlobalBucket(tx)
 	kvg.TreeHash = overallHash[:]
 	return gbkt.Put(TreeHashKeyName, kvg.TreeHash)
@@ -54,6 +69,7 @@ func (kvg *KVGossipDB) ensureTreeHash() {
 		} else {
 			kvg.TreeHash = make([]byte, len(data))
 			copy(kvg.TreeHash, data)
+			log.Infof("Overall tree hash loaded: %s", util.HashToString(data))
 		}
 		return nil
 	})

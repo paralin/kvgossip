@@ -8,6 +8,7 @@ import "github.com/fuserobotics/kvgossip/data/data.proto";
 message SyncGlobalHash {
   string kvgossip_version = 1;
   bytes global_tree_hash = 2;
+  string host_nonce = 3;
 }
 
 // Offer our local hash for a key.

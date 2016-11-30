@@ -19,12 +19,14 @@ type SyncManager struct {
 	syncServicePort  int
 	sessions         map[int]*SyncSession
 	sessionIdCounter int
+	dedupe           *SyncSessionDedupe
 }
 
 func NewSyncManager(d *db.KVGossipDB, servicePort int) *SyncManager {
 	return &SyncManager{
 		db:              d,
 		stopped:         true,
+		dedupe:          NewSyncSessionDedupe(),
 		stopChan:        make(chan bool, 1),
 		syncServicePort: servicePort,
 		sessions:        make(map[int]*SyncSession),
@@ -54,7 +56,7 @@ func (sm *SyncManager) Connect(peer string) error {
 	}
 	defer conn.Close()
 	client := NewSyncServiceClient(conn)
-	ss := NewSyncSession(sm.db, true)
+	ss := NewSyncSession(sm.db, sm.dedupe, true)
 	sm.startSyncSession(ss)
 	stream, err := client.SyncSession(context.Background())
 	if err != nil {
@@ -110,7 +112,7 @@ func (sm *SyncManager) syncLoop() {
 }
 
 func (sm *SyncManager) SyncSession(stream SyncService_SyncSessionServer) error {
-	session := NewSyncSession(sm.db, false)
+	session := NewSyncSession(sm.db, sm.dedupe, false)
 	sm.startSyncSession(session)
 	return session.SyncSession(stream)
 }
