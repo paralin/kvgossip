@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"net"
 
@@ -20,11 +21,13 @@ type SyncManager struct {
 	sessions         map[int]*SyncSession
 	sessionIdCounter int
 	dedupe           *SyncSessionDedupe
+	rootKey          *rsa.PublicKey
 }
 
-func NewSyncManager(d *db.KVGossipDB, servicePort int) *SyncManager {
+func NewSyncManager(d *db.KVGossipDB, servicePort int, rootKey *rsa.PublicKey) *SyncManager {
 	return &SyncManager{
 		db:              d,
+		rootKey:         rootKey,
 		stopped:         true,
 		dedupe:          NewSyncSessionDedupe(),
 		stopChan:        make(chan bool, 1),
@@ -56,7 +59,7 @@ func (sm *SyncManager) Connect(peer string) error {
 	}
 	defer conn.Close()
 	client := NewSyncServiceClient(conn)
-	ss := NewSyncSession(sm.db, sm.dedupe, true)
+	ss := NewSyncSession(sm.db, sm.dedupe, true, sm.rootKey)
 	sm.startSyncSession(ss)
 	stream, err := client.SyncSession(context.Background())
 	if err != nil {
@@ -112,7 +115,7 @@ func (sm *SyncManager) syncLoop() {
 }
 
 func (sm *SyncManager) SyncSession(stream SyncService_SyncSessionServer) error {
-	session := NewSyncSession(sm.db, sm.dedupe, false)
+	session := NewSyncSession(sm.db, sm.dedupe, false, sm.rootKey)
 	sm.startSyncSession(session)
 	return session.SyncSession(stream)
 }

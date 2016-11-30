@@ -1,16 +1,19 @@
 package tx
 
 import (
+	"crypto"
 	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/binary"
+
 	"errors"
+	"time"
 
 	"github.com/fuserobotics/kvgossip/data"
 	"github.com/fuserobotics/kvgossip/grant"
 	"github.com/fuserobotics/kvgossip/key"
 	"github.com/fuserobotics/kvgossip/util"
 )
-
-var InvalidArgumentError error = errors.New("Arguments are invalid.")
 
 // Context for a verify grant authorization request.
 // Finds chains from root -> actor
@@ -76,9 +79,9 @@ type VerifyGrantAuthorizationResult struct {
 // Verify attempts to find chains of grants from the list of signed grants
 // which enable the requested action to the performed. The chains will have
 // the root key as the first element, always, and the actor key as the last element.
-func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, pool *grant.GrantAuthorizationPool, revocationChecker grant.RevocationChecker) (*VerifyGrantAuthorizationResult, error) {
+func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, pool *grant.GrantAuthorizationPool, revocationChecker grant.RevocationChecker) *VerifyGrantAuthorizationResult {
 	if root == nil || pool == nil || target == nil {
-		return nil, InvalidArgumentError
+		return nil
 	}
 
 	valid, revocations, invalid := pool.ValidGrants(true, revocationChecker)
@@ -105,10 +108,47 @@ func VerifyGrantAuthorization(target *Transaction, root *rsa.PublicKey, pool *gr
 		InvalidGrants: invalid,
 		ValidGrants:   valid,
 		Revocations:   revocations,
-	}, nil
+	}
 }
 
 // SatisfiedBy checks if a grant could have issued a transaction.
 func (trx *Transaction) SatisfiedBy(gra *grant.Grant) bool {
 	return key.KeyPatternContains(gra.KeyRegex, trx.Key)
+}
+
+// Initial check of a transaction message.
+func (trx *Transaction) Validate() error {
+	if trx.Key == "" {
+		return errors.New("Key must be set on transaction.")
+	}
+	if trx.TransactionType != Transaction_TRANSACTION_SET {
+		return errors.New("Only set transactions are supported.")
+	}
+	if trx.Verification == nil {
+		return errors.New("Transaction verification is required.")
+	}
+	if err := trx.Verification.Validate(); err != nil {
+		return err
+	}
+	// Verify signature matches.
+	pubKey, err := util.ParsePublicKey(trx.Verification.SignerPublicKey)
+	if err != nil {
+		return err
+	}
+	hashBuf := make([]byte, len(trx.Value)+8)
+	copy(hashBuf, trx.Value)
+	binary.LittleEndian.PutUint64(hashBuf[len(trx.Value):], trx.Verification.Timestamp)
+	hash := sha256.Sum256(trx.Value)
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hash[:], trx.Verification.ValueSignature)
+}
+
+func (trx *TransactionVerification) Validate() error {
+	if trx.Grant == nil || len(trx.Grant.SignedGrants) == 0 {
+		return errors.New("Transaction must have a grant pool.")
+	}
+	stamp := util.NumberToTime(int64(trx.Timestamp))
+	if stamp.After(time.Now()) {
+		return errors.New("Timestamp is in the future.")
+	}
+	return nil
 }

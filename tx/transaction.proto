@@ -27,5 +27,5 @@ message TransactionVerification {
   // Grant authorization
   grant.GrantAuthorizationPool grant = 3;
   // Timestamp
-  int64 timestamp = 4;
+  uint64 timestamp = 4;
 }

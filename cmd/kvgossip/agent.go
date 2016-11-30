@@ -1,19 +1,42 @@
 package main
 
 import (
+	"crypto/rsa"
+	"io/ioutil"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/fuserobotics/kvgossip/agent"
+	"github.com/fuserobotics/kvgossip/util"
 	"github.com/urfave/cli"
 )
 
 var AgentFlags struct {
 	DbPath          string
 	SyncServicePort int
+	RootKeyPath     string
+	RootKey         *rsa.PublicKey
+}
+
+func loadRootKey() error {
+	data, err := ioutil.ReadFile(AgentFlags.RootKeyPath)
+	if err != nil {
+		return err
+	}
+	pk, err := util.ParsePublicKey(data)
+	if err != nil {
+		return err
+	}
+	AgentFlags.RootKey = pk
+	return nil
 }
 
 func buildAgent() (*agent.Agent, error) {
+	log.Infof("Loading root key %s...", AgentFlags.RootKeyPath)
+	if err := loadRootKey(); err != nil {
+		return nil, err
+	}
 	log.Infof("Attempting to open DB %s...", AgentFlags.DbPath)
-	ag, err := agent.NewAgent(AgentFlags.DbPath, AgentFlags.SyncServicePort)
+	ag, err := agent.NewAgent(AgentFlags.DbPath, AgentFlags.SyncServicePort, AgentFlags.RootKey)
 	if err != nil {
 		log.Errorf("Error opening db: %v", err)
 	}

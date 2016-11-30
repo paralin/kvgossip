@@ -9,6 +9,5 @@ message SignedData {
   enum SignedDataType {
     SIGNED_GRANT = 0;
     SIGNED_GRANT_REVOCATION = 2;
-    SIGNED_TRANSACTION = 3;
   }
 }

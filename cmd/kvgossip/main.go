@@ -18,6 +18,7 @@ func main() {
 	app.Commands = []cli.Command{
 		AgentCommand,
 		ManualSyncCommand,
+		KeyGenCommand,
 	}
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -25,6 +26,12 @@ func main() {
 			Usage:       "Use database at `PATH`.",
 			Value:       "./kvgossip.db",
 			Destination: &AgentFlags.DbPath,
+		},
+		cli.StringFlag{
+			Name:        "rootkey, r",
+			Usage:       "Use root key at `PATH`.",
+			Value:       "./root_key.pem",
+			Destination: &AgentFlags.RootKeyPath,
 		},
 	}
 	app.Run(os.Args)

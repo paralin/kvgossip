@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"crypto/rsa"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,16 +15,18 @@ type Agent struct {
 	DB              *db.KVGossipDB
 	SyncManager     *sync.SyncManager
 	SyncServicePort int
+	RootKey         *rsa.PublicKey
 }
 
-func NewAgent(dbPath string, syncServicePort int) (*Agent, error) {
+func NewAgent(dbPath string, syncServicePort int, rootKey *rsa.PublicKey) (*Agent, error) {
 	res := &Agent{SyncServicePort: syncServicePort}
 	d, err := db.OpenDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
 	res.DB = d
-	res.SyncManager = sync.NewSyncManager(d, syncServicePort)
+	res.RootKey = rootKey
+	res.SyncManager = sync.NewSyncManager(d, syncServicePort, rootKey)
 	return res, nil
 }
 

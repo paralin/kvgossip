@@ -2,6 +2,7 @@ package sync
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"errors"
 	"io"
 	"time"
@@ -9,6 +10,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
 	"github.com/fuserobotics/kvgossip/db"
+	"github.com/fuserobotics/kvgossip/tx"
 	"github.com/fuserobotics/kvgossip/util"
 	"github.com/fuserobotics/kvgossip/version"
 	"golang.org/x/net/context"
@@ -17,6 +19,8 @@ import (
 var SessionMessageTimeout time.Duration = time.Duration(5) * time.Second
 var TimeoutErr error = errors.New("No messages before timeout.")
 var DuplicateSessionErr error = errors.New("Duplicate sync session.")
+
+const MaxSyncSpinCount int = 3
 
 type SyncSessionStream interface {
 	Context() context.Context
@@ -28,12 +32,17 @@ type SyncSessionState struct {
 	ReceivedGlobalHash bool
 
 	RemoteGlobalHash []byte
+	RemoteKeyHashes  map[string][]byte
+	// Number of times we've tried the sync process
+	SyncSpinCount int
 }
 
 // An instance of a sync session
 type SyncSession struct {
 	// The database
 	DB *db.KVGossipDB
+	// Root key
+	RootKey *rsa.PublicKey
 	// Dedupe
 	Dedupe *SyncSessionDedupe
 	// Did we initiate the session
@@ -58,13 +67,14 @@ type SyncSession struct {
 	DisconnectNow bool
 }
 
-func NewSyncSession(d *db.KVGossipDB, dd *SyncSessionDedupe, initiator bool) *SyncSession {
+func NewSyncSession(d *db.KVGossipDB, dd *SyncSessionDedupe, initiator bool, rootKey *rsa.PublicKey) *SyncSession {
 	return &SyncSession{
 		DB:        d,
 		Initiator: initiator,
 		Dedupe:    dd,
 		Ended:     make(chan bool, 1),
 		RecvChan:  make(chan *SyncSessionMessage),
+		RootKey:   rootKey,
 	}
 }
 
@@ -92,6 +102,114 @@ func (ss *SyncSession) runSyncSession() error {
 	}
 	if err := ss.assertGlobalHash(msg); err != nil || ss.DisconnectNow {
 		return err
+	}
+
+	// Iterate through our local keys and attempt to compare them.
+	err = ss.DB.ForeachKeyVerification(ss.ReadTransaction, func(k string, v *tx.TransactionVerification) error {
+		err := ss.Stream.Send(&SyncSessionMessage{
+			SyncKeyHash: &SyncKeyHash{
+				Signature: v.ValueSignature,
+				Key:       k,
+				Timestamp: v.Timestamp,
+			},
+		})
+		if err != nil {
+			return err
+		}
+		msg, err := ss.waitForResponseWithTimeout()
+		if err != nil {
+			return err
+		}
+		if msg.SyncKeyHash != nil {
+			return nil
+		} else if msg.SyncKey != nil {
+			if msg.SyncKey.RequestKey != k {
+				return errors.New("Request key did not match last sent key hash.")
+			}
+			if msg.SyncKey.Transaction == nil {
+				return ss.sendKeyTransaction(k)
+			} else {
+				trans := msg.SyncKey.Transaction
+				err = trans.Validate()
+				if err != nil {
+					return err
+				}
+				if trans.Key != k {
+					return errors.New("Key mismatch in SyncKey body.")
+				}
+
+				if trans.Verification.Timestamp < v.Timestamp {
+					return errors.New("Peer offered key with older timestamp than ours.")
+				}
+
+				syncKeyResult, err := ss.handleIncomingTransaction(trans, msg.SyncKey)
+				if err != nil {
+					return err
+				}
+				return ss.Stream.Send(&SyncSessionMessage{
+					SyncKeyResult: syncKeyResult,
+				})
+			}
+		} else {
+			return errors.New("Expected SyncKey or SyncKeyHash response.")
+		}
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ss *SyncSession) handleIncomingTransaction(trans *tx.Transaction, sk *SyncKey) (*SyncKeyResult, error) {
+	// validate
+	res := tx.VerifyGrantAuthorization(trans, ss.RootKey, sk.Transaction.Verification.Grant, ss.DB)
+	syncKeyResult := &SyncKeyResult{
+		Revocations: res.Revocations,
+		UpdatedKey:  trans.Key,
+	}
+	if len(res.Chains) > 0 {
+		log.Debugf("Received valid new value for key %s, timestamp %v.", trans.Key, util.NumberToTime(int64(trans.Verification.Timestamp)))
+		if err := ss.DB.ApplyTransaction(trans); err != nil {
+			return nil, err
+		}
+	} else {
+		log.Debugf("For key %s, peer sent valid transaction with no valid grants (%d local revocations).", trans.Key, len(res.Revocations))
+	}
+	return syncKeyResult, nil
+}
+
+func (ss *SyncSession) sendKeyTransaction(key string) error {
+	log.Debugf("Sending data for key %s to remote peer.", key)
+	tx := ss.ReadTransaction
+	trx := ss.DB.GetTransaction(tx, key)
+	if trx == nil {
+		return errors.New("Unable to pull that transaction from the db.")
+	}
+	err := ss.Stream.Send(&SyncSessionMessage{
+		SyncKey: &SyncKey{
+			RequestKey:  key,
+			Transaction: trx,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	msg, err := ss.waitForResponseWithTimeout()
+	if err != nil {
+		return err
+	}
+	if msg.SyncKeyResult == nil {
+		return errors.New("Expected SyncKeyResult after SyncKey.")
+	}
+	if msg.SyncKeyResult.UpdatedKey != trx.Key {
+		return errors.New("Key mismatch in SyncKeyResult.")
+	}
+	numRev := len(msg.SyncKeyResult.Revocations)
+	for i, revocation := range msg.SyncKeyResult.Revocations {
+		log.Debug("Applying revocation %d/%d from peer...", i+1, numRev)
+		if err := ss.DB.ApplyRevocation(revocation); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -127,11 +245,25 @@ func (ss *SyncSession) handleGlobalHash(msg *SyncGlobalHash) error {
 	if err := msg.Validate(); err != nil {
 		return err
 	}
+	// We re-received a global hash
+	if ss.State.ReceivedGlobalHash {
+		if ss.Initiator {
+			return errors.New("Did not expect to receive a global hash twice.")
+		} else {
+			log.Debug("Remote re-started sync.")
+			ss.State.SyncSpinCount++
+			ss.State.ReceivedGlobalHash = false
+			if ss.State.SyncSpinCount > MaxSyncSpinCount {
+				return errors.New("Too many sync attempts.")
+			}
+		}
+	}
 	// we force a new read transaction
 	_, err := ss.buildReadTransaction()
 	if err != nil {
 		return err
 	}
+	ss.State.RemoteKeyHashes = make(map[string][]byte)
 	ss.State.RemoteGlobalHash = msg.GlobalTreeHash
 	if !ss.State.ReceivedGlobalHash {
 		nonce := msg.HostNonce
