@@ -1,10 +1,7 @@
 package main
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"github.com/fuserobotics/kvgossip/ctl"
-	"github.com/fuserobotics/kvgossip/grant"
-	"github.com/fuserobotics/kvgossip/util"
 	"github.com/urfave/cli"
 	"golang.org/x/net/context"
 )
@@ -18,16 +15,6 @@ var ControlListGrantsCommand cli.Command = cli.Command{
 			return err
 		}
 
-		log.Info("List of grants:")
-		for _, gra := range res.Grants {
-			vgd, err := grant.ValidateGrantData(gra)
-			if err != nil {
-				return err
-			}
-			hash := util.HexSha256(gra.Body)
-			log.Infof("%s: %s", hash[:8], vgd.Grant.KeyRegex)
-		}
-
-		return nil
+		return printGrantList(res.Grants)
 	},
 }

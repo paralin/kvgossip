@@ -44,7 +44,9 @@ func NewAgent(dbPath string, syncServicePort int, controlServicePort string, roo
 func (a *Agent) Run() error {
 	log.Info("DB ok, agent starting up...")
 	a.SyncManager.Start()
-	a.ControlServer.Start(a.ControlServerPort)
+	if err := a.ControlServer.Start(a.ControlServerPort); err != nil {
+		return err
+	}
 	a.SerfManager.TreeHashChan = a.DB.TreeHashChanged
 	a.SerfManager.Start()
 

@@ -14,6 +14,13 @@ message PutGrantResponse {
   repeated data.SignedData revocations = 1;
 }
 
+message PutRevocationRequest {
+  data.SignedData revocation = 1;
+}
+
+message PutRevocationResponse {
+}
+
 // Request a pool of grants that would satisfy a request.
 message BuildTransactionRequest {
   bytes entity_public_key = 1;
@@ -50,6 +57,7 @@ message GetKeyResponse {
 
 service ControlService {
   rpc PutGrant(PutGrantRequest) returns (PutGrantResponse) {}
+  rpc PutRevocation(PutRevocationRequest) returns (PutRevocationResponse) {}
   rpc BuildTransaction(BuildTransactionRequest) returns (BuildTransactionResponse) {}
   rpc PutTransaction(PutTransactionRequest) returns (PutTransactionResponse) {}
   rpc GetGrants(GetGrantsRequest) returns (GetGrantsResponse) {}

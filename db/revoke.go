@@ -82,8 +82,8 @@ func (kvg *KVGossipDB) ApplyRevocation(sd *dn.SignedData, rootKey *rsa.PublicKey
 			}, rootKey, checker)
 			if len(res.Chains) == 0 {
 				log.Warnf("Deleting key %s due to new revocation.", k)
-				kvg.PurgeKey(tx, k)
 				numDeleted++
+				kvg.PurgeKey(tx, k)
 				return nil
 			}
 			if oldLen != len(v.Grant.SignedGrants) {
@@ -99,12 +99,6 @@ func (kvg *KVGossipDB) ApplyRevocation(sd *dn.SignedData, rootKey *rsa.PublicKey
 			kvg.UpdateKeyVerification(tx, k, v)
 		}
 
-		if numDeleted > 0 {
-			if err := kvg.UpdateOverallHash(tx); err != nil {
-				return err
-			}
-		}
-
 		// Delete the grant if it exists in the pool.
 		key := util.HexSha256(rev.Grant.Body)
 
@@ -116,6 +110,12 @@ func (kvg *KVGossipDB) ApplyRevocation(sd *dn.SignedData, rootKey *rsa.PublicKey
 		bd, err := proto.Marshal(sd)
 		if err != nil {
 			return err
+		}
+
+		if numDeleted > 0 {
+			if err := kvg.UpdateOverallHash(tx); err != nil {
+				return err
+			}
 		}
 		return bkt.Put([]byte(key), bd)
 	})

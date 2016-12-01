@@ -8,8 +8,8 @@ import (
 
 // BoltDB backed database for KVGossip.
 type KVGossipDB struct {
-	DB              *bolt.DB
-	TreeHash        []byte
+	DB *bolt.DB
+	// TreeHash        []byte
 	TreeHashChanged chan []byte
 }
 

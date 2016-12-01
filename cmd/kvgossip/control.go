@@ -63,6 +63,7 @@ var ControlCommand cli.Command = cli.Command{
 		ControlSetKeyCommand,
 		ControlGetKeyCommand,
 		ControlListGrantsCommand,
+		ControlRevokeGrantCommand,
 	},
 	After: func(c *cli.Context) error {
 		if ControlFlags.Connection != nil {

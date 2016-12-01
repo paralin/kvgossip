@@ -268,7 +268,7 @@ func (ss *SyncSession) sendKeyTransaction(key string) error {
 	}
 	numRev := len(msg.SyncKeyResult.Revocations)
 	for i, revocation := range msg.SyncKeyResult.Revocations {
-		log.Debug("Applying revocation %d/%d from peer...", i+1, numRev)
+		log.Debugf("Applying revocation %d/%d from peer...", i+1, numRev)
 		if err := ss.DB.ApplyRevocation(revocation, ss.RootKey); err != nil {
 			return err
 		}
@@ -311,13 +311,13 @@ func (ss *SyncSession) handleGlobalHash(msg *SyncGlobalHash) error {
 			return err
 		}
 	}
-	if bytes.Compare(ss.State.RemoteGlobalHash, ss.DB.TreeHash) == 0 {
+	if bytes.Compare(ss.State.RemoteGlobalHash, ss.DB.GetOverallHash()) == 0 {
 		log.Debug("Remote hash matches local hash, disconnecting.")
 		ss.DisconnectNow = true
 	} else {
 		log.Debugf("Remote hash %s != local %s, attempting sync.",
 			util.HashToString(ss.State.RemoteGlobalHash),
-			util.HashToString(ss.DB.TreeHash))
+			util.HashToString(ss.DB.GetOverallHash()))
 	}
 	return nil
 }
@@ -337,7 +337,7 @@ func (ss *SyncSession) assertGlobalHash(msg *SyncSessionMessage) error {
 func (ss *SyncSession) sendSyncGlobalHash() error {
 	return ss.Stream.Send(&SyncSessionMessage{
 		SyncGlobalHash: &SyncGlobalHash{
-			GlobalTreeHash:  ss.DB.TreeHash,
+			GlobalTreeHash:  ss.DB.GetOverallHash(),
 			KvgossipVersion: version.KVGossipVersion,
 			HostNonce:       ss.Dedupe.LocalNonce,
 		},
@@ -358,7 +358,7 @@ func (ss *SyncSession) handleMessage(msg *SyncSessionMessage) error {
 	skh := msg.SyncKeyHash
 	if len(skh.Key) == 0 {
 		// We now need to send keys that we have locally but not remotely.
-		log.Debug("Sending new keys.")
+		log.Debug("Sending new keys (foreign %v).", ss.State.RemoteKeyHashes)
 		err := ss.DB.DB.View(func(readTransaction *bolt.Tx) error {
 			return ss.DB.ForeachKeyHash(readTransaction, func(k string, v []byte) error {
 				if _, ok := ss.State.RemoteKeyHashes[k]; ok {

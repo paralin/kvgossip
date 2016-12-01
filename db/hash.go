@@ -27,6 +27,16 @@ func (kvg *KVGossipDB) UpdateKeyHash(tx *bolt.Tx, key string, keyData []byte) er
 	return bkt.Put([]byte(key), hash[:])
 }
 
+func (kvg *KVGossipDB) GetOverallHash() []byte {
+	var data []byte
+	kvg.DB.View(func(tx *bolt.Tx) error {
+		bkt := kvg.GetGlobalBucket(tx)
+		data = bkt.Get(TreeHashKeyName)
+		return nil
+	})
+	return data
+}
+
 func (kvg *KVGossipDB) UpdateOverallHash(tx *bolt.Tx) error {
 	if !tx.Writable() {
 		return errors.New("Transaction must be writable.")
@@ -52,15 +62,15 @@ func (kvg *KVGossipDB) UpdateOverallHash(tx *bolt.Tx) error {
 		i++
 	}
 
+	oldHash := kvg.GetOverallHash()
 	overallHash := sha256.Sum256(buf)
-	if len(kvg.TreeHash) != 0 && bytes.Compare(overallHash[:], kvg.TreeHash) != 0 {
+	if len(oldHash) != 0 && bytes.Compare(overallHash[:], oldHash) != 0 {
 		log.Infof("Overall tree hash updated -> %s", util.HashToString(overallHash[:]))
 	}
 
 	gbkt := kvg.GetGlobalBucket(tx)
-	kvg.TreeHash = overallHash[:]
-	kvg.TreeHashChanged <- kvg.TreeHash
-	return gbkt.Put(TreeHashKeyName, kvg.TreeHash)
+	kvg.TreeHashChanged <- overallHash[:]
+	return gbkt.Put(TreeHashKeyName, overallHash[:])
 }
 
 func (kvg *KVGossipDB) ensureTreeHash() {

@@ -132,6 +132,23 @@ func (ct *CtlServer) GetKey(ctx context.Context, req *GetKeyRequest) (*GetKeyRes
 	return res, nil
 }
 
+func (ct *CtlServer) PutRevocation(ctx context.Context, req *PutRevocationRequest) (*PutRevocationResponse, error) {
+	if req.Revocation == nil {
+		return nil, errors.New("Cannot put a nil revocation.")
+	}
+	vgd, err := grant.ValidateGrantData(req.Revocation)
+	if err != nil {
+		return nil, err
+	}
+	if vgd.GrantRevocation == nil || vgd.RevokedGrant == nil {
+		return nil, errors.New("Data did not contain a revocation.")
+	}
+	if err := ct.DB.ApplyRevocation(req.Revocation, ct.RootKey); err != nil {
+		return nil, err
+	}
+	return &PutRevocationResponse{}, nil
+}
+
 func (ct *CtlServer) Start(listen string) error {
 	if ct.server != nil {
 		return nil
