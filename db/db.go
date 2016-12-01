@@ -8,8 +8,9 @@ import (
 
 // BoltDB backed database for KVGossip.
 type KVGossipDB struct {
-	DB       *bolt.DB
-	TreeHash []byte
+	DB              *bolt.DB
+	TreeHash        []byte
+	TreeHashChanged chan []byte
 }
 
 func OpenDB(dbPath string) (*KVGossipDB, error) {
@@ -19,6 +20,7 @@ func OpenDB(dbPath string) (*KVGossipDB, error) {
 		return nil, err
 	}
 	res.DB = db
+	res.TreeHashChanged = make(chan []byte, 10)
 	res.ensureBuckets()
 	res.ensureTreeHash()
 	return res, nil

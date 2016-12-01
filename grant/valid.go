@@ -118,6 +118,15 @@ func (g *Grant) Validate() error {
 	if err := key.ValidatePattern(g.KeyRegex); err != nil {
 		return err
 	}
+	if bytes.Compare(g.IssueeKey, g.IssuerKey) == 0 {
+		return errors.New("IssueeKey cannot be the same as IssuerKey, this does nothing.")
+	}
+	if _, err := util.ParsePublicKey(g.IssueeKey); err != nil {
+		return err
+	}
+	if _, err := util.ParsePublicKey(g.IssuerKey); err != nil {
+		return err
+	}
 	return nil
 }
 

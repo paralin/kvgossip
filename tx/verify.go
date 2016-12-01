@@ -60,7 +60,7 @@ func (vga *verifyGrantAuthorization) evaluate(curr *grant.ValidGrantData, target
 		// issuer_key = root, or current satisfies target
 		// Current satisfies target = issuer + issuee matches, regex allows it, subgrant_allowed = true
 		if (curr.Grant == nil && util.ComparePublicKey(curr.PublicKey, gra.PublicKey)) ||
-			curr.Grant.SatisfiesGrant(gra.Grant) {
+			(curr.Grant != nil && curr.Grant.SatisfiesGrant(gra.Grant)) {
 			vga.evaluate(gra, target)
 		}
 	}

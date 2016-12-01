@@ -11,17 +11,24 @@ import (
 	"google.golang.org/grpc"
 )
 
+type queuedSync struct {
+	Peer      string
+	PeerNonce string
+}
+
 // State machine. Attempts to run sync sessions against peers.
 type SyncManager struct {
+	Dedupe          *SyncSessionDedupe
+	SyncServicePort int
+
 	db               *db.KVGossipDB
 	stopped          bool
 	stopChan         chan bool
 	serverDisabled   bool
-	syncServicePort  int
 	sessions         map[int]*SyncSession
 	sessionIdCounter int
-	dedupe           *SyncSessionDedupe
 	rootKey          *rsa.PublicKey
+	syncQueue        chan *queuedSync
 }
 
 func NewSyncManager(d *db.KVGossipDB, servicePort int, rootKey *rsa.PublicKey) *SyncManager {
@@ -29,10 +36,11 @@ func NewSyncManager(d *db.KVGossipDB, servicePort int, rootKey *rsa.PublicKey) *
 		db:              d,
 		rootKey:         rootKey,
 		stopped:         true,
-		dedupe:          NewSyncSessionDedupe(),
+		Dedupe:          NewSyncSessionDedupe(),
 		stopChan:        make(chan bool, 1),
-		syncServicePort: servicePort,
+		SyncServicePort: servicePort,
 		sessions:        make(map[int]*SyncSession),
+		syncQueue:       make(chan *queuedSync, 50),
 	}
 }
 
@@ -52,6 +60,21 @@ func (sm *SyncManager) SetServerDisabled(disabled bool) {
 	sm.serverDisabled = disabled
 }
 
+func (sm *SyncManager) QueueSync(peer, peernonce string) {
+	if len(peer) == 0 {
+		return
+	}
+	if len(peernonce) != 0 {
+		if sm.Dedupe.HasSession(peernonce) {
+			return
+		}
+	}
+	sm.syncQueue <- &queuedSync{
+		Peer:      peer,
+		PeerNonce: peernonce,
+	}
+}
+
 func (sm *SyncManager) Connect(peer string) error {
 	conn, err := grpc.Dial(peer, grpc.WithInsecure())
 	if err != nil {
@@ -59,7 +82,7 @@ func (sm *SyncManager) Connect(peer string) error {
 	}
 	defer conn.Close()
 	client := NewSyncServiceClient(conn)
-	ss := NewSyncSession(sm.db, sm.dedupe, true, sm.rootKey)
+	ss := NewSyncSession(sm.db, sm.Dedupe, true, sm.rootKey)
 	sm.startSyncSession(ss)
 	stream, err := client.SyncSession(context.Background())
 	if err != nil {
@@ -87,18 +110,18 @@ func (sm *SyncManager) syncLoop() {
 	grpcServer := grpc.NewServer()
 	RegisterSyncServiceServer(grpcServer, sm)
 
-	if sm.syncServicePort <= 0 {
+	if sm.SyncServicePort <= 0 {
 		sm.serverDisabled = true
 	}
 	if !sm.serverDisabled {
 		go func() {
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", sm.syncServicePort))
+			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", sm.SyncServicePort))
 			if err != nil {
 				log.Warnf("Unable to start sync service, %v", err)
 				sm.serverDisabled = true
 				return
 			}
-			log.Infof("Sync service listening on port %d", sm.syncServicePort)
+			log.Infof("Sync service listening on port %d", sm.SyncServicePort)
 			grpcServer.Serve(lis)
 		}()
 		defer func() {
@@ -107,15 +130,22 @@ func (sm *SyncManager) syncLoop() {
 	}
 
 	for {
+	QueueSelect:
 		select {
 		case <-sm.stopChan:
 			return
+		case queued := <-sm.syncQueue:
+			if len(queued.PeerNonce) != 0 && sm.Dedupe.HasSession(queued.PeerNonce) {
+				break QueueSelect
+			}
+			log.Debugf("Initiating sync session with %s from queue.", queued.Peer)
+			go sm.Connect(queued.Peer)
 		}
 	}
 }
 
 func (sm *SyncManager) SyncSession(stream SyncService_SyncSessionServer) error {
-	session := NewSyncSession(sm.db, sm.dedupe, false, sm.rootKey)
+	session := NewSyncSession(sm.db, sm.Dedupe, false, sm.rootKey)
 	sm.startSyncSession(session)
 	return session.SyncSession(stream)
 }

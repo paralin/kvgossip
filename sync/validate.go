@@ -1,6 +1,9 @@
 package sync
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 func (sgh *SyncGlobalHash) Validate() error {
 	if sgh.KvgossipVersion == "" {
@@ -9,8 +12,8 @@ func (sgh *SyncGlobalHash) Validate() error {
 	if len(sgh.GlobalTreeHash) != 32 {
 		return errors.New("Sha256 global tree hash required.")
 	}
-	if len(sgh.HostNonce) != 30 {
-		return errors.New("Host nonce length 30 required.")
+	if len(sgh.HostNonce) != 10 {
+		return fmt.Errorf("Host nonce length 30 required (got %d '%s').", len(sgh.HostNonce), sgh.HostNonce)
 	}
 	return nil
 }

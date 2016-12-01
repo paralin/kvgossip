@@ -115,6 +115,7 @@ func (ss *SyncSession) runSyncSession() error {
 	localData := []*localKeyData{}
 
 	// Iterate through our local keys and attempt to compare them.
+	log.Debug("Sending peer our keys...")
 	err = ss.DB.DB.View(func(readTransaction *bolt.Tx) error {
 		return ss.DB.ForeachKeyVerification(readTransaction, func(k string, v *tx.TransactionVerification) error {
 			hash := ss.DB.GetKeyHash(readTransaction, k)
@@ -145,7 +146,7 @@ func (ss *SyncSession) runSyncSession() error {
 			return err
 		}
 		if msg.SyncKeyHash != nil {
-			return nil
+			break
 		} else if msg.SyncKey != nil {
 			if msg.SyncKey.RequestKey != lk.Key {
 				return errors.New("Request key did not match last sent key hash.")
@@ -178,6 +179,7 @@ func (ss *SyncSession) runSyncSession() error {
 			return errors.New("Expected SyncKey or SyncKeyHash response.")
 		}
 	}
+	log.Debug("Asking for new keys from remote.")
 	err = ss.Stream.Send(&SyncSessionMessage{
 		SyncKeyHash: &SyncKeyHash{
 			Key: "",
@@ -195,6 +197,7 @@ func (ss *SyncSession) runSyncSession() error {
 		// SyncKeyHash indicates end of new keys.
 		if msg.SyncKeyHash != nil {
 			// Allow re-starting again
+			log.Debug("Finished handling new keys, restarting session.")
 			ss.State.ReceivedGlobalHash = false
 			break
 		}
@@ -359,6 +362,7 @@ func (ss *SyncSession) handleMessage(msg *SyncSessionMessage) error {
 	skh := msg.SyncKeyHash
 	if len(skh.Key) == 0 {
 		// We now need to send keys that we have locally but not remotely.
+		log.Debug("Sending new keys.")
 		err := ss.DB.DB.View(func(readTransaction *bolt.Tx) error {
 			return ss.DB.ForeachKeyHash(readTransaction, func(k string, v []byte) error {
 				if _, ok := ss.State.RemoteKeyHashes[k]; ok {
@@ -374,6 +378,7 @@ func (ss *SyncSession) handleMessage(msg *SyncSessionMessage) error {
 		ss.State.SyncSpinCount++
 		ss.State.ReceivedGlobalHash = false
 		// indicate to remote that we are ready
+		log.Debug("Indicating we are ready.")
 		return ss.Stream.Send(&SyncSessionMessage{
 			SyncKeyHash: &SyncKeyHash{
 				Key: "",

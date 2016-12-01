@@ -16,6 +16,7 @@ var AgentFlags struct {
 	ControlServicePort string
 	RootKeyPath        string
 	RootKey            *rsa.PublicKey
+	SerfRpcAddr        string
 }
 
 func loadRootKey() error {
@@ -37,7 +38,7 @@ func buildAgent() (*agent.Agent, error) {
 		return nil, err
 	}
 	log.Infof("Attempting to open DB %s...", AgentFlags.DbPath)
-	ag, err := agent.NewAgent(AgentFlags.DbPath, AgentFlags.SyncServicePort, AgentFlags.ControlServicePort, AgentFlags.RootKey)
+	ag, err := agent.NewAgent(AgentFlags.DbPath, AgentFlags.SyncServicePort, AgentFlags.ControlServicePort, AgentFlags.RootKey, AgentFlags.SerfRpcAddr)
 	if err != nil {
 		log.Errorf("Error opening db: %v", err)
 	}
@@ -68,6 +69,12 @@ var AgentCommand cli.Command = cli.Command{
 			Usage:       "Start control service on `PORT`.",
 			Value:       "localhost:9022",
 			Destination: &AgentFlags.ControlServicePort,
+		},
+		cli.StringFlag{
+			Name:        "serfrpc, r",
+			Usage:       "Connect to Serf RPC at `ADDR`.",
+			Value:       "127.0.0.1:7373",
+			Destination: &AgentFlags.SerfRpcAddr,
 		},
 	},
 }

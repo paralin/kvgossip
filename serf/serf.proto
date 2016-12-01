@@ -1,0 +1,12 @@
+syntax = "proto3";
+package serf;
+
+message SerfQueryMessage {
+  SerfTreeHashBroadcast tree_hash = 1;
+  string host_nonce = 2;
+}
+
+message SerfTreeHashBroadcast {
+  bytes tree_hash = 1;
+  uint32 sync_port = 2;
+}

@@ -14,9 +14,16 @@ type SyncSessionDedupe struct {
 
 func NewSyncSessionDedupe() *SyncSessionDedupe {
 	return &SyncSessionDedupe{
-		LocalNonce:     util.RandStringRunes(30),
+		LocalNonce:     util.RandStringRunes(10),
 		activeSessions: make(map[string]*SyncSession),
 	}
+}
+
+func (ss *SyncSessionDedupe) HasSession(nonce string) bool {
+	ss.sessionMutex.Lock()
+	defer ss.sessionMutex.Unlock()
+	_, ok := ss.activeSessions[nonce]
+	return ok
 }
 
 func (ss *SyncSessionDedupe) TryRegisterSession(key string, sess *SyncSession) bool {

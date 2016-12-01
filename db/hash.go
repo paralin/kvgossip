@@ -59,20 +59,13 @@ func (kvg *KVGossipDB) UpdateOverallHash(tx *bolt.Tx) error {
 
 	gbkt := kvg.GetGlobalBucket(tx)
 	kvg.TreeHash = overallHash[:]
+	kvg.TreeHashChanged <- kvg.TreeHash
 	return gbkt.Put(TreeHashKeyName, kvg.TreeHash)
 }
 
 func (kvg *KVGossipDB) ensureTreeHash() {
 	kvg.DB.Update(func(tx *bolt.Tx) error {
-		gbkt := kvg.GetGlobalBucket(tx)
-		data := gbkt.Get(TreeHashKeyName)
-		if len(data) == 0 {
-			kvg.UpdateOverallHash(tx)
-		} else {
-			kvg.TreeHash = make([]byte, len(data))
-			copy(kvg.TreeHash, data)
-			log.Infof("Overall tree hash loaded: %s", util.HashToString(data))
-		}
+		kvg.UpdateOverallHash(tx)
 		return nil
 	})
 }
