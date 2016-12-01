@@ -2,6 +2,7 @@ package db
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"errors"
 
 	"github.com/boltdb/bolt"
@@ -47,7 +48,7 @@ func (arc *applyRevocationChecker) GetRevocation(grantData []byte) *dn.SignedDat
 	return nil
 }
 
-func (kvg *KVGossipDB) ApplyRevocation(sd *dn.SignedData) error {
+func (kvg *KVGossipDB) ApplyRevocation(sd *dn.SignedData, rootKey *rsa.PublicKey) error {
 	if sd.BodyType != dn.SignedData_SIGNED_GRANT_REVOCATION {
 		return NoValidRevocationErr
 	}
@@ -71,19 +72,31 @@ func (kvg *KVGossipDB) ApplyRevocation(sd *dn.SignedData) error {
 			RevokedGrant: rev.Grant.Body,
 		}
 		numDeleted := 0
-		err := kvg.DB.View(func(vtx *bolt.Tx) error {
-			return kvg.ForeachKeyVerification(vtx, func(k string, v *txna.TransactionVerification) error {
-				valid, _, _ := v.Grant.ValidGrants(false, checker)
-				if len(valid) == 0 {
-					log.Warnf("Deleting key %s due to new revocation.", k)
-					kvg.PurgeKey(tx, k)
-					numDeleted++
-				}
+		toPut := make(map[string]*txna.TransactionVerification)
+		err := kvg.ForeachKeyVerification(tx, func(k string, v *txna.TransactionVerification) error {
+			oldLen := len(v.Grant.SignedGrants)
+			res := txna.VerifyGrantAuthorization(&txna.Transaction{
+				Key:             k,
+				TransactionType: txna.Transaction_TRANSACTION_SET,
+				Verification:    v,
+			}, rootKey, checker)
+			if len(res.Chains) == 0 {
+				log.Warnf("Deleting key %s due to new revocation.", k)
+				kvg.PurgeKey(tx, k)
+				numDeleted++
 				return nil
-			})
+			}
+			if oldLen != len(v.Grant.SignedGrants) {
+				toPut[k] = v
+			}
+			return nil
 		})
 		if err != nil {
 			return err
+		}
+
+		for k, v := range toPut {
+			kvg.UpdateKeyVerification(tx, k, v)
 		}
 
 		if numDeleted > 0 {

@@ -50,8 +50,6 @@ type SyncSession struct {
 	Initiator bool
 	// State
 	State SyncSessionState
-	// When the session ended
-	Ended chan bool
 	// Timeout ticker
 	Timeout *time.Timer
 	// Error to return
@@ -71,7 +69,6 @@ func NewSyncSession(d *db.KVGossipDB, dd *SyncSessionDedupe, initiator bool, roo
 		DB:        d,
 		Initiator: initiator,
 		Dedupe:    dd,
-		Ended:     make(chan bool, 1),
 		RecvChan:  make(chan *SyncSessionMessage),
 		RootKey:   rootKey,
 	}
@@ -272,7 +269,7 @@ func (ss *SyncSession) sendKeyTransaction(key string) error {
 	numRev := len(msg.SyncKeyResult.Revocations)
 	for i, revocation := range msg.SyncKeyResult.Revocations {
 		log.Debug("Applying revocation %d/%d from peer...", i+1, numRev)
-		if err := ss.DB.ApplyRevocation(revocation); err != nil {
+		if err := ss.DB.ApplyRevocation(revocation, ss.RootKey); err != nil {
 			return err
 		}
 	}
@@ -478,7 +475,6 @@ func (ss *SyncSession) SyncSession(stream SyncSessionStream) error {
 		for _, cleanup := range ss.Cleanup {
 			cleanup()
 		}
-		ss.Ended <- true
 	}()
 
 	if ss.Initiator {

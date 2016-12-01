@@ -22,6 +22,7 @@ type SerfManager struct {
 	serfMessageChan  chan map[string]interface{}
 	serfStreamHandle client.StreamHandle
 	serfClient       *client.RPCClient
+	bthInProgress    bool
 }
 
 func NewSerfManager(sm *sync.SyncManager, serfRpc string) *SerfManager {
@@ -147,9 +148,15 @@ func (sm *SerfManager) handleRemoteTreeHash(messageId uint64, mess *SerfQueryMes
 }
 
 func (sm *SerfManager) broadcastTreeHash() {
-	if sm.serfClient == nil {
+	if sm.serfClient == nil || sm.bthInProgress {
 		return
 	}
+	sm.bthInProgress = true
+	log.Debug("Initiating tree hash sweep.")
+	defer func() {
+		sm.bthInProgress = false
+		log.Debug("Completed tree hash sweep.")
+	}()
 	msg := &SerfQueryMessage{
 		TreeHash: &SerfTreeHashBroadcast{
 			TreeHash: sm.TreeHash,
@@ -162,7 +169,6 @@ func (sm *SerfManager) broadcastTreeHash() {
 		return
 	}
 	rch := make(chan client.NodeResponse, 30)
-	log.Debug("Initiating tree hash sweep.")
 	err = sm.serfClient.Query(&client.QueryParam{
 		RequestAck: false,
 		Name:       "kvgossip",
@@ -207,7 +213,6 @@ func (sm *SerfManager) broadcastTreeHash() {
 			}
 		}
 	}
-	log.Debug("Completed tree hash sweep.")
 }
 
 func (sm *SerfManager) initSerfStream() (initError error) {

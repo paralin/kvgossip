@@ -95,10 +95,9 @@ func (sm *SyncManager) startSyncSession(ss *SyncSession) {
 	sm.sessionIdCounter++
 	id := sm.sessionIdCounter
 	sm.sessions[id] = ss
-	go func() {
-		<-ss.Ended
+	ss.Cleanup = append(ss.Cleanup, func() {
 		delete(sm.sessions, id)
-	}()
+	})
 }
 
 func (sm *SyncManager) syncLoop() {
