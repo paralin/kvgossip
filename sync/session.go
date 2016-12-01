@@ -115,7 +115,6 @@ func (ss *SyncSession) runSyncSession() error {
 	localData := []*localKeyData{}
 
 	// Iterate through our local keys and attempt to compare them.
-	log.Debug("Sending peer our keys...")
 	err = ss.DB.DB.View(func(readTransaction *bolt.Tx) error {
 		return ss.DB.ForeachKeyVerification(readTransaction, func(k string, v *tx.TransactionVerification) error {
 			hash := ss.DB.GetKeyHash(readTransaction, k)
@@ -378,7 +377,6 @@ func (ss *SyncSession) handleMessage(msg *SyncSessionMessage) error {
 		ss.State.SyncSpinCount++
 		ss.State.ReceivedGlobalHash = false
 		// indicate to remote that we are ready
-		log.Debug("Indicating we are ready.")
 		return ss.Stream.Send(&SyncSessionMessage{
 			SyncKeyHash: &SyncKeyHash{
 				Key: "",
