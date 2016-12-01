@@ -61,6 +61,7 @@ var ControlCommand cli.Command = cli.Command{
 	Subcommands: []cli.Command{
 		ControlBuildGrantCommand,
 		ControlSetKeyCommand,
+		ControlGetKeyCommand,
 		ControlListGrantsCommand,
 	},
 	After: func(c *cli.Context) error {

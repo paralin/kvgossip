@@ -12,7 +12,7 @@ func (db *KVGossipDB) ApplyTransaction(trans *tx.Transaction) error {
 			return err
 		}
 	}
-	return db.DB.Update(func(tx *bolt.Tx) error {
+	err := db.DB.Update(func(tx *bolt.Tx) error {
 		// Update key hash
 		if err := db.UpdateKeyHash(tx, trans.Key, trans.Value); err != nil {
 			return err
@@ -25,7 +25,12 @@ func (db *KVGossipDB) ApplyTransaction(trans *tx.Transaction) error {
 		if err := db.UpdateKeyVerification(tx, trans.Key, trans.Verification); err != nil {
 			return err
 		}
-		// Update global hash
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return db.DB.Update(func(tx *bolt.Tx) error {
 		return db.UpdateOverallHash(tx)
 	})
 }
