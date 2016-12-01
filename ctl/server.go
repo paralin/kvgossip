@@ -7,6 +7,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/boltdb/bolt"
 	"github.com/fuserobotics/kvgossip/data"
 	"github.com/fuserobotics/kvgossip/db"
 	"github.com/fuserobotics/kvgossip/grant"
@@ -114,6 +115,21 @@ func (ct *CtlServer) PutTransaction(ctx context.Context, req *PutTransactionRequ
 		return nil, err
 	}
 	return &PutTransactionResponse{}, nil
+}
+
+func (ct *CtlServer) GetKey(ctx context.Context, req *GetKeyRequest) (*GetKeyResponse, error) {
+	if req.Key == "" {
+		return nil, errors.New("Must specify key.")
+	}
+	res := &GetKeyResponse{}
+	err := ct.DB.DB.View(func(tx *bolt.Tx) error {
+		res.Transaction = ct.DB.GetTransaction(tx, req.Key)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (ct *CtlServer) Start(listen string) error {

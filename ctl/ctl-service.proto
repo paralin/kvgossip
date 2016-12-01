@@ -40,9 +40,18 @@ message GetGrantsResponse {
   repeated data.SignedData grants = 1;
 }
 
+message GetKeyRequest {
+  string key = 1;
+}
+
+message GetKeyResponse {
+  tx.Transaction transaction = 1;
+}
+
 service ControlService {
   rpc PutGrant(PutGrantRequest) returns (PutGrantResponse) {}
   rpc BuildTransaction(BuildTransactionRequest) returns (BuildTransactionResponse) {}
   rpc PutTransaction(PutTransactionRequest) returns (PutTransactionResponse) {}
   rpc GetGrants(GetGrantsRequest) returns (GetGrantsResponse) {}
+  rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
 }
