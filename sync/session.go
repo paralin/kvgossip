@@ -90,74 +90,93 @@ func (ss *SyncSession) waitForResponseWithTimeout() (*SyncSessionMessage, error)
 	}
 }
 
+type localKeyData struct {
+	Key          string
+	Verification *tx.TransactionVerification
+	Hash         []byte
+}
+
 func (ss *SyncSession) runSyncSession() error {
 	if err := ss.sendSyncGlobalHash(); err != nil {
 		return err
 	}
+
 	// Wait for the global hash.
 	msg, err := ss.waitForResponseWithTimeout()
 	if err != nil {
 		return err
 	}
+
 	if err := ss.assertGlobalHash(msg); err != nil || ss.DisconnectNow {
 		return err
 	}
+
+	// Build the keys in memory.
+	localData := []*localKeyData{}
 
 	// Iterate through our local keys and attempt to compare them.
 	err = ss.DB.DB.View(func(readTransaction *bolt.Tx) error {
 		return ss.DB.ForeachKeyVerification(readTransaction, func(k string, v *tx.TransactionVerification) error {
 			hash := ss.DB.GetKeyHash(readTransaction, k)
-			err := ss.Stream.Send(&SyncSessionMessage{
-				SyncKeyHash: &SyncKeyHash{
-					Hash:      hash,
-					Key:       k,
-					Timestamp: v.Timestamp,
-				},
+			localData = append(localData, &localKeyData{
+				Hash:         hash,
+				Key:          k,
+				Verification: v,
 			})
-			if err != nil {
-				return err
-			}
-			msg, err := ss.waitForResponseWithTimeout()
-			if err != nil {
-				return err
-			}
-			if msg.SyncKeyHash != nil {
-				return nil
-			} else if msg.SyncKey != nil {
-				if msg.SyncKey.RequestKey != k {
-					return errors.New("Request key did not match last sent key hash.")
-				}
-				if msg.SyncKey.Transaction == nil {
-					return ss.sendKeyTransaction(k)
-				} else {
-					trans := msg.SyncKey.Transaction
-					err = trans.Validate()
-					if err != nil {
-						return err
-					}
-					if trans.Key != k {
-						return errors.New("Key mismatch in SyncKey body.")
-					}
-
-					if trans.Verification.Timestamp < v.Timestamp {
-						return errors.New("Peer offered key with older timestamp than ours.")
-					}
-
-					syncKeyResult, err := ss.handleIncomingTransaction(msg.SyncKey)
-					if err != nil {
-						return err
-					}
-					return ss.Stream.Send(&SyncSessionMessage{
-						SyncKeyResult: syncKeyResult,
-					})
-				}
-			} else {
-				return errors.New("Expected SyncKey or SyncKeyHash response.")
-			}
+			return nil
 		})
 	})
 	if err != nil {
 		return err
+	}
+	for _, lk := range localData {
+		err := ss.Stream.Send(&SyncSessionMessage{
+			SyncKeyHash: &SyncKeyHash{
+				Hash:      lk.Hash,
+				Key:       lk.Key,
+				Timestamp: lk.Verification.Timestamp,
+			},
+		})
+		if err != nil {
+			return err
+		}
+		msg, err := ss.waitForResponseWithTimeout()
+		if err != nil {
+			return err
+		}
+		if msg.SyncKeyHash != nil {
+			return nil
+		} else if msg.SyncKey != nil {
+			if msg.SyncKey.RequestKey != lk.Key {
+				return errors.New("Request key did not match last sent key hash.")
+			}
+			if msg.SyncKey.Transaction == nil {
+				return ss.sendKeyTransaction(lk.Key)
+			} else {
+				trans := msg.SyncKey.Transaction
+				err = trans.Validate()
+				if err != nil {
+					return err
+				}
+				if trans.Key != lk.Key {
+					return errors.New("Key mismatch in SyncKey body.")
+				}
+
+				if trans.Verification.Timestamp < lk.Verification.Timestamp {
+					return errors.New("Peer offered key with older timestamp than ours.")
+				}
+
+				syncKeyResult, err := ss.handleIncomingTransaction(msg.SyncKey)
+				if err != nil {
+					return err
+				}
+				return ss.Stream.Send(&SyncSessionMessage{
+					SyncKeyResult: syncKeyResult,
+				})
+			}
+		} else {
+			return errors.New("Expected SyncKey or SyncKeyHash response.")
+		}
 	}
 	err = ss.Stream.Send(&SyncSessionMessage{
 		SyncKeyHash: &SyncKeyHash{
@@ -466,6 +485,7 @@ func (ss *SyncSession) SyncSession(stream SyncSessionStream) error {
 				ss.Error = err
 			}
 			ss.State.SyncSpinCount++
+			ss.State.ReceivedGlobalHash = false
 		}
 	} else {
 		// If we're not the initiator, wait for messages.

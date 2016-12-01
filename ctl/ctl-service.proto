@@ -15,12 +15,12 @@ message PutGrantResponse {
 }
 
 // Request a pool of grants that would satisfy a request.
-message GetGrantPoolRequest {
+message BuildTransactionRequest {
   bytes entity_public_key = 1;
   string key = 2;
 }
 
-message GetGrantPoolResponse {
+message BuildTransactionResponse {
   tx.Transaction transaction = 1;
   repeated data.SignedData revocations = 2;
   repeated data.SignedData invalid = 3;
@@ -33,8 +33,16 @@ message PutTransactionRequest {
 message PutTransactionResponse {
 }
 
+message GetGrantsRequest {
+}
+
+message GetGrantsResponse {
+  repeated data.SignedData grants = 1;
+}
+
 service ControlService {
   rpc PutGrant(PutGrantRequest) returns (PutGrantResponse) {}
-  rpc GetGrantPool(GetGrantPoolRequest) returns (GetGrantPoolResponse) {}
+  rpc BuildTransaction(BuildTransactionRequest) returns (BuildTransactionResponse) {}
   rpc PutTransaction(PutTransactionRequest) returns (PutTransactionResponse) {}
+  rpc GetGrants(GetGrantsRequest) returns (GetGrantsResponse) {}
 }

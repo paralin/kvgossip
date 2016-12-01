@@ -33,7 +33,7 @@ var ControlSetKeyCommand cli.Command = cli.Command{
 			return err
 		}
 
-		res, err := ControlFlags.Client.GetGrantPool(context.Background(), &ctl.GetGrantPoolRequest{
+		res, err := ControlFlags.Client.BuildTransaction(context.Background(), &ctl.BuildTransactionRequest{
 			EntityPublicKey: mpk,
 			Key:             SetKeyFlags.Key,
 		})

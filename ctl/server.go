@@ -30,8 +30,16 @@ func NewCtlServer(d *db.KVGossipDB, rootKey *rsa.PublicKey) *CtlServer {
 	}
 }
 
+func (ct *CtlServer) GetGrants(ctx context.Context, req *GetGrantsRequest) (*GetGrantsResponse, error) {
+	// Pull the entire list of grants out of the DB.
+	grants := ct.DB.GetAllGrants()
+	return &GetGrantsResponse{
+		Grants: grants,
+	}, nil
+}
+
 // Request a pool of grants that would satisfy a request.
-func (ct *CtlServer) GetGrantPool(ctx context.Context, req *GetGrantPoolRequest) (*GetGrantPoolResponse, error) {
+func (ct *CtlServer) BuildTransaction(ctx context.Context, req *BuildTransactionRequest) (*BuildTransactionResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -65,7 +73,7 @@ func (ct *CtlServer) GetGrantPool(ctx context.Context, req *GetGrantPoolRequest)
 	finalPool = data.DedupeSignedData(finalPool)
 	trans.Verification.Grant.SignedGrants = finalPool
 	log.Debugf("Generated pool of %d grants for requested transaction against %s.", len(finalPool), req.Key)
-	return &GetGrantPoolResponse{
+	return &BuildTransactionResponse{
 		Invalid:     res.InvalidGrants,
 		Revocations: res.Revocations,
 		Transaction: trans,

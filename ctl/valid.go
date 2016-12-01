@@ -4,7 +4,7 @@ import (
 	"errors"
 )
 
-func (req *GetGrantPoolRequest) Validate() error {
+func (req *BuildTransactionRequest) Validate() error {
 	if req.Key == "" {
 		return errors.New("Must specify key.")
 	}
