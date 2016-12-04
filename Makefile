@@ -1,5 +1,12 @@
 gengo: protogen install-go
 
+dumb-init:
+	wget https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64 -O dumb-init
+
+docker: dumb-init
+	CGO_ENABLED=0 go build -v -o kvgossip ./cmd/kvgossip
+	docker build -t "fuserobotics/kvgossip:latest" .
+
 protogen:
 	protowrap -I $${GOPATH}/src \
 		--gogo_out=plugins=grpc:$${GOPATH}/src \
