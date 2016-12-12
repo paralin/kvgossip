@@ -14,3 +14,22 @@ An entity can issue a **grant revocation**. This revocation prevents a node from
 When the agent starts, it broadcasts its own local tree hash over a Serf query. Nodes that disagree will respond with their own local tree hashes. The agent then connects to each of the nodes that disagree, and the two nodes come to an agreement of the true value of the key.
 
 When a grant is revoked, we must iterate through all the key/value metadata objects, and delete any revoked grants from their grant pools. Next, the grant authorization should be verified again. If the verification now comes back as unsatisfied, we should unset the field completely.
+
+Client
+======
+
+The KVGossip client has the following jobs:
+
+ - Supply multiple remote addresses to connect to, manage connections
+ - Keep a list of key subscriptions, keep those keys up to date locally.
+
+Clients might be interested to know:
+
+ - Current remote value
+ - If the current remote value is dirty.
+ - When the value changes.
+ - When the dirtiness changes.
+
+On a client object, one can call `SubscribeKey` to return a subscription object for a key. This subscription object has a function called `unsubscribe` which will terminate the subscription. Once a key returns to 0 subscriptions the system will cull the interest (after a short delay) and forget the key's value.
+
+The subscription object has functions to return Channels to get the new value, the new dirtiness value, etc.
