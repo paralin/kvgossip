@@ -2,10 +2,11 @@ package main
 
 import (
 	"errors"
+	"os"
+
 	"github.com/fuserobotics/kvgossip/ctl"
 	"github.com/urfave/cli"
 	"golang.org/x/net/context"
-	"os"
 )
 
 var GetKeyFlags struct {

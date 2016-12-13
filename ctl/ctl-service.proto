@@ -55,6 +55,15 @@ message GetKeyResponse {
   tx.Transaction transaction = 1;
 }
 
+// Subscribe to changes in KeyVerification object.
+message SubscribeKeyVerRequest {
+  string key = 1;
+}
+
+message SubscribeKeyVerResponse {
+  tx.TransactionVerification verification = 1;
+}
+
 service ControlService {
   rpc PutGrant(PutGrantRequest) returns (PutGrantResponse) {}
   rpc PutRevocation(PutRevocationRequest) returns (PutRevocationResponse) {}
@@ -62,4 +71,5 @@ service ControlService {
   rpc PutTransaction(PutTransactionRequest) returns (PutTransactionResponse) {}
   rpc GetGrants(GetGrantsRequest) returns (GetGrantsResponse) {}
   rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
+  rpc SubscribeKeyVer(SubscribeKeyVerRequest) returns (stream SubscribeKeyVerResponse) {}
 }

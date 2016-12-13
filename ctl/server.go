@@ -149,6 +149,30 @@ func (ct *CtlServer) PutRevocation(ctx context.Context, req *PutRevocationReques
 	return &PutRevocationResponse{}, nil
 }
 
+func (ct *CtlServer) SubscribeKeyVer(req *SubscribeKeyVerRequest, stream ControlService_SubscribeKeyVerServer) error {
+	if req.Key == "" {
+		return errors.New("Key must be specified.")
+	}
+
+	dch := stream.Context().Done()
+	ch := make(chan *tx.Transaction, 10)
+	ct.DB.TransactionStreamSubscribe(ch)
+	defer ct.DB.TransactionStreamUnsubscribe(ch)
+
+	for {
+		select {
+		case trans := <-ch:
+			if trans.Key == req.Key {
+				stream.Send(&SubscribeKeyVerResponse{
+					Verification: trans.Verification,
+				})
+			}
+		case <-dch:
+			return nil
+		}
+	}
+}
+
 func (ct *CtlServer) Start(listen string) error {
 	if ct.server != nil {
 		return nil
