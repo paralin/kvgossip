@@ -1,7 +1,2 @@
-cover.out
-node_modules/
-coverage/
-yarn.lock
-.tmp.json
-kvgossip
 dumb-init
+kvgossip

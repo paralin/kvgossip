@@ -1,8 +1,0 @@
-*.go
-*.out
-Makefile
-Jenkinsfile
-scripts/
-coverage/
-yarn.lock
-.yarn-cache/
