@@ -25,8 +25,16 @@ type KeySubscription struct {
 }
 
 type KeySubscriptionState struct {
-	HasValue    bool
-	Dirty       bool
+	/** Do we have a value yet?
+	 *  If this is true and Transaction is nil,
+	 *  there's no value for that key yet.
+	 */
+	HasValue bool
+
+	// Dirty indicates the value may have changed.
+	Dirty bool
+
+	// Transaction. Do not modify!
 	Transaction *tx.Transaction
 }
 

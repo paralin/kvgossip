@@ -147,19 +147,22 @@ func (i *interest) session(conn *Connection) (sessionError error) {
 	}
 
 	rch := make(chan *ctl.SubscribeKeyVerResponse)
-	var rchErr error
-	go func() {
+	rchErr := make(chan error, 1)
+	go func() (rchError error) {
+		defer func() {
+			rchErr <- rchError
+		}()
+
 		callCtx := client.Context()
 		for {
 			resp, err := client.Recv()
 			if err != nil {
-				rchErr = err
-				return
+				return err
 			}
 			select {
 			case rch <- resp:
 			case <-callCtx.Done():
-				return
+				return nil
 			}
 		}
 	}()
@@ -170,10 +173,9 @@ func (i *interest) session(conn *Connection) (sessionError error) {
 			return nil
 		case <-connReleased:
 			return nil
-		case resp, ok := <-rch:
-			if !ok {
-				return rchErr
-			}
+		case err := <-rchErr:
+			return err
+		case resp := <-rch:
 			ns := i.handleNextVerification(resp.Verification)
 			if ns.Dirty {
 				doneChan := make(chan error, 1)
