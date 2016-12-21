@@ -7,6 +7,7 @@ import (
 	"github.com/fuserobotics/kvgossip/tx"
 	"github.com/oleiade/lane"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 type interest struct {
@@ -141,7 +142,7 @@ func (i *interest) session(conn *Connection) (sessionError error) {
 	stb := conn.stub
 	client, err := stb.SubscribeKeyVer(sessionCtx, &ctl.SubscribeKeyVerRequest{
 		Key: i.key,
-	})
+	}, grpc.FailFast(true))
 	if err != nil {
 		return err
 	}
@@ -198,17 +199,19 @@ func (i *interest) session(conn *Connection) (sessionError error) {
 }
 
 func (i *interest) handleNextVerification(v *tx.TransactionVerification) (nextState *KeySubscriptionState) {
+	i.stateMtx.RLock()
+	lastState := i.state
+	i.stateMtx.RUnlock()
+
 	nextState = &KeySubscriptionState{
-		HasValue: true,
+		HasValue: lastState.HasValue,
 	}
 
 	if v == nil {
+		nextState.HasValue = true
 		i.nextState(nextState)
 		return
 	}
-
-	i.stateMtx.RLock()
-	lastState := i.state
 
 	// Determine if we need to fetch a value.
 	// This is in the following conditions:
@@ -222,7 +225,6 @@ func (i *interest) handleNextVerification(v *tx.TransactionVerification) (nextSt
 			lastState.Transaction.Verification.Timestamp != v.Timestamp)
 	nextState.Transaction = lastState.Transaction
 
-	i.stateMtx.RUnlock()
 	i.nextState(nextState)
 	return
 }
@@ -230,7 +232,7 @@ func (i *interest) handleNextVerification(v *tx.TransactionVerification) (nextSt
 func (i *interest) updateLoop() {
 	sessionActive := false
 	for {
-		if !sessionActive {
+		if !sessionActive && !i.connectionQueue.Empty() {
 			// Try to get a connection
 			nextConn := i.connectionQueue.Dequeue().(*Connection)
 			if nextConn.Released() {

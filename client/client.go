@@ -33,6 +33,10 @@ func (c *Client) applyConnection(nconn *Connection) {
 }
 
 func (c *Client) AddConnection(conn *grpc.ClientConn) *Connection {
+	if conn == nil {
+		return nil
+	}
+
 	// Build the connection and store it.
 	c.connMtx.Lock()
 	c.connIdCounter++

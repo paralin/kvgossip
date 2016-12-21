@@ -7,13 +7,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Release a connection if we see one of these.
-var connErrors = []error{
-	grpc.ErrClientConnClosing,
-	grpc.ErrServerStopped,
-	grpc.ErrClientConnTimeout,
-}
-
 type Connection struct {
 	id   uint32
 	conn *grpc.ClientConn
@@ -60,16 +53,15 @@ func (c *Connection) Error() error {
 
 // Set the error, if it's a connection related error release the conn.
 func (c *Connection) setError(err error) {
+	if err == nil {
+		return
+	}
+
 	c.releaseMtx.Lock()
 	c.releaseError = err
 	c.releaseMtx.Unlock()
 
-	for _, connErr := range connErrors {
-		if connErr == err {
-			c.Release()
-			break
-		}
-	}
+	c.Release()
 }
 
 // Release the connection.
