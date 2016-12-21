@@ -1,16 +1,25 @@
 package db
 
 import (
+	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/fuserobotics/kvgossip/tx"
 )
 
 // BoltDB backed database for KVGossip.
 type KVGossipDB struct {
-	DB *bolt.DB
-	// TreeHash        []byte
+	DB              *bolt.DB
 	TreeHashChanged chan []byte
+
+	keyChanged         chan *tx.Transaction
+	keySubscriptions   map[string][]*KeySubscription
+	keySubscriptionMtx sync.Mutex
+
+	closeOnce          sync.Once
+	closeSubscriptions chan bool
+	lastCloseError     error
 }
 
 func OpenDB(dbPath string) (*KVGossipDB, error) {
@@ -21,7 +30,26 @@ func OpenDB(dbPath string) (*KVGossipDB, error) {
 	}
 	res.DB = db
 	res.TreeHashChanged = make(chan []byte, 10)
+	res.keyChanged = make(chan *tx.Transaction, 10)
+	res.keySubscriptions = make(map[string][]*KeySubscription)
+	res.closeSubscriptions = make(chan bool, 1)
 	res.ensureBuckets()
 	res.ensureTreeHash()
+
+	go res.handleSubscriptions()
+
 	return res, nil
+}
+
+func (db *KVGossipDB) Close() error {
+	var err error
+	db.closeOnce.Do(func() {
+		db.closeSubscriptions <- true
+		err = db.DB.Close()
+	})
+	if err == nil {
+		err = db.lastCloseError
+	}
+	db.lastCloseError = err
+	return err
 }

@@ -30,7 +30,12 @@ func (db *KVGossipDB) ApplyTransaction(trans *tx.Transaction) error {
 	if err != nil {
 		return err
 	}
-	return db.DB.Update(func(tx *bolt.Tx) error {
+	err = db.DB.Update(func(tx *bolt.Tx) error {
 		return db.UpdateOverallHash(tx)
 	})
+	if err != nil {
+		return err
+	}
+	db.keyChanged <- trans
+	return nil
 }

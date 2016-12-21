@@ -18,12 +18,9 @@ When a grant is revoked, we must iterate through all the key/value metadata obje
 Client
 ======
 
-The KVGossip client has the following jobs:
+The KVGossip client keeps a list of key subscriptions, and keeps those keys up to date locally. It does so by maintaining a persistent state of these keys through different connections.
 
- - Supply multiple remote addresses to connect to, manage connections
- - Keep a list of key subscriptions, keep those keys up to date locally.
-
-Clients might be interested to know:
+Users might be interested to know:
 
  - Current remote value
  - If the current remote value is dirty.
