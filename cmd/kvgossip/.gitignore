@@ -2,3 +2,4 @@ kvgossip*.db
 kvgossip
 *.pem
 startn.bash
+!*.go
