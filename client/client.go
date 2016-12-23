@@ -69,9 +69,14 @@ func (c *Client) SubscribeKey(key string) *KeySubscription {
 			interest.addConnection(conn)
 		}
 		c.connMtx.RUnlock()
+
+		c.interests[key] = interest
 	}
 
-	nsub := newKeySubscription(c, interest)
+	interest.stateMtx.RLock()
+	nsub := newKeySubscription(c, interest, interest.state)
+	interest.stateMtx.RUnlock()
+
 	interest.addSubscription(nsub)
 	nsub.OnDisposed(func(*KeySubscription) {
 		c.interestMtx.Lock()

@@ -22,9 +22,17 @@ var ControlWatchKeyCommand cli.Command = cli.Command{
 
 		conn := ControlFlags.Connection
 		nt := client.NewClient()
+
+		subHandle := nt.SubscribeKey(WatchKeyFlags.Key)
+
+		ch := make(chan *client.KeySubscriptionState, 10)
+		subHandle.Changes(ch)
+		defer subHandle.Unsubscribe()
+
+		releasedChan := make(chan bool, 1)
 		connHandle := nt.AddConnection(conn)
 		defer connHandle.Release()
-		releasedChan := make(chan bool, 1)
+
 		connHandle.OnRelease(func(c *client.Connection) {
 			select {
 			case releasedChan <- true:
@@ -32,16 +40,12 @@ var ControlWatchKeyCommand cli.Command = cli.Command{
 			}
 		})
 
-		subHandle := nt.SubscribeKey(WatchKeyFlags.Key)
 		subHandle.OnDisposed(func(ks *client.KeySubscription) {
 			select {
 			case releasedChan <- true:
 			default:
 			}
 		})
-		ch := make(chan *client.KeySubscriptionState, 10)
-		subHandle.Changes(ch)
-		defer subHandle.Unsubscribe()
 
 	UpdateLoop:
 		for {

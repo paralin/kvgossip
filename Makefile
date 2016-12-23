@@ -7,6 +7,10 @@ docker: dumb-init
 	CGO_ENABLED=0 go build -v -o kvgossip ./cmd/kvgossip
 	docker build -t "fuserobotics/kvgossip:latest" .
 
+push: docker
+	docker tag fuserobotics/kvgossip:latest registry.fusebot.io/fuserobotics/kvgossip:base
+	docker push registry.fusebot.io/fuserobotics/kvgossip:base
+
 protogen:
 	protowrap -I $${GOPATH}/src \
 		--go_out=plugins=grpc:$${GOPATH}/src \
@@ -14,12 +18,6 @@ protogen:
 		--print_structure \
 		--only_specified_files \
 		$$(pwd)/**/*.proto
-
-deps:
-	go get -u github.com/square/goprotowrap/cmd/protowrap
-
-compile-roles:
-	go build -v $(COMPILE_ROLES_DIR)
 
 install-go:
 	for D in */; do go install -v github.com/fuserobotics/kvgossip/$$D 2>/dev/null || true ; done

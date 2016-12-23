@@ -38,11 +38,23 @@ type KeySubscriptionState struct {
 	Transaction *tx.Transaction
 }
 
-func newKeySubscription(client *Client, interest *interest) *KeySubscription {
+// If other is equiv to kss, return other.
+func (kss *KeySubscriptionState) ShallowEqual(other *KeySubscriptionState) *KeySubscriptionState {
+	if kss.Dirty == other.Dirty &&
+		kss.HasValue == other.HasValue &&
+		kss.Transaction == other.Transaction {
+		return other
+	}
+
+	return kss
+}
+
+func newKeySubscription(client *Client, interest *interest, firstState *KeySubscriptionState) *KeySubscription {
 	return &KeySubscription{
-		client:   client,
-		interest: interest,
-		state:    make(chan *KeySubscriptionState, 1),
+		client:    client,
+		interest:  interest,
+		state:     make(chan *KeySubscriptionState, 1),
+		lastState: firstState,
 	}
 }
 
@@ -83,6 +95,7 @@ func (ks *KeySubscription) updateLoop() {
 func (ks *KeySubscription) State() *KeySubscriptionState {
 	ks.lastStateMtx.RLock()
 	defer ks.lastStateMtx.RUnlock()
+
 	return ks.lastState
 }
 

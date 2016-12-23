@@ -75,12 +75,19 @@ func (in *interest) removeSubscription(ks *KeySubscription) {
 func (in *interest) nextState(state *KeySubscriptionState) {
 	in.stateMtx.Lock()
 	in.subscriptionMtx.RLock()
+	defer in.subscriptionMtx.RUnlock()
+	defer in.stateMtx.Unlock()
+
+	// Avoid duplicate events with identical states.
+	if in.state != nil &&
+		state.ShallowEqual(in.state) == in.state {
+		return
+	}
+
 	in.state = state
 	for _, sub := range in.subscriptions {
 		sub.next(state)
 	}
-	in.subscriptionMtx.RUnlock()
-	in.stateMtx.Unlock()
 }
 
 // Kill the interest by filling the dispose channel.
@@ -206,10 +213,10 @@ func (i *interest) handleNextVerification(v *tx.TransactionVerification) (nextSt
 	nextState = &KeySubscriptionState{
 		HasValue: lastState.HasValue,
 	}
+	defer i.nextState(nextState)
 
 	if v == nil {
 		nextState.HasValue = true
-		i.nextState(nextState)
 		return
 	}
 
@@ -225,7 +232,6 @@ func (i *interest) handleNextVerification(v *tx.TransactionVerification) (nextSt
 			lastState.Transaction.Verification.Timestamp != v.Timestamp)
 	nextState.Transaction = lastState.Transaction
 
-	i.nextState(nextState)
 	return
 }
 
@@ -250,7 +256,9 @@ func (i *interest) updateLoop() {
 		case <-i.sessionEnded:
 			sessionActive = false
 			i.sessionEnded = nil
+			continue
 		case <-i.newConn:
+			continue
 		case <-i.disposeChan:
 			return
 		}

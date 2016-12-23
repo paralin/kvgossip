@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"net"
+	"sync"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/fuserobotics/kvgossip/db"
@@ -21,14 +22,18 @@ type SyncManager struct {
 	Dedupe          *SyncSessionDedupe
 	SyncServicePort int
 
-	db               *db.KVGossipDB
-	stopped          bool
-	stopChan         chan bool
-	serverDisabled   bool
+	db *db.KVGossipDB
+
+	stopped        bool
+	stopChan       chan bool
+	serverDisabled bool
+
 	sessions         map[int]*SyncSession
 	sessionIdCounter int
-	rootKey          *rsa.PublicKey
-	syncQueue        chan *queuedSync
+	sessionsMtx      sync.RWMutex
+
+	rootKey   *rsa.PublicKey
+	syncQueue chan *queuedSync
 }
 
 func NewSyncManager(d *db.KVGossipDB, servicePort int, rootKey *rsa.PublicKey) *SyncManager {
@@ -92,11 +97,15 @@ func (sm *SyncManager) Connect(peer string) error {
 }
 
 func (sm *SyncManager) startSyncSession(ss *SyncSession) {
+	sm.sessionsMtx.Lock()
 	sm.sessionIdCounter++
 	id := sm.sessionIdCounter
 	sm.sessions[id] = ss
+	sm.sessionsMtx.Unlock()
 	ss.Cleanup = append(ss.Cleanup, func() {
+		sm.sessionsMtx.Lock()
 		delete(sm.sessions, id)
+		sm.sessionsMtx.Unlock()
 	})
 }
 
