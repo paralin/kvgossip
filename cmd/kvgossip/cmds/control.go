@@ -63,6 +63,7 @@ var ControlCommand cli.Command = cli.Command{
 		ControlSetKeyCommand,
 		ControlGetKeyCommand,
 		ControlWatchKeyCommand,
+		ControlListKeysCommand,
 		ControlListGrantsCommand,
 		ControlRevokeGrantCommand,
 	},

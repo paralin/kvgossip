@@ -1,4 +1,4 @@
-package ctl
+package ctlserver
 
 import (
 	"crypto/rsa"
@@ -8,13 +8,16 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+
+	. "github.com/fuserobotics/kvgossip/ctl"
 	"github.com/fuserobotics/kvgossip/data"
 	"github.com/fuserobotics/kvgossip/db"
+	"github.com/fuserobotics/kvgossip/filter"
 	"github.com/fuserobotics/kvgossip/grant"
 	"github.com/fuserobotics/kvgossip/tx"
 	"github.com/fuserobotics/kvgossip/util"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 )
 
 type CtlServer struct {
@@ -178,6 +181,43 @@ func (ct *CtlServer) SubscribeKeyVer(req *SubscribeKeyVerRequest, stream Control
 			return nil
 		}
 	}
+}
+
+func (ct *CtlServer) ListKeys(req *ListKeysRequest, stream ControlService_ListKeysServer) error {
+	done := stream.Context().Done()
+	hasFilter := len(req.Filter) > 0
+	noErrorErr := errors.New("no error")
+
+	nk := uint32(0)
+	err := ct.DB.DB.View(func(t *bolt.Tx) error {
+		return ct.DB.ForeachKeyHash(t, func(k string, v []byte) error {
+			if req.MaxKeys > 0 && nk >= req.MaxKeys {
+				return noErrorErr
+			}
+
+			select {
+			case <-done:
+				return noErrorErr
+			default:
+			}
+
+			if hasFilter && !filter.MatchesFilters(k, req.Filter) {
+				return nil
+			}
+
+			nk++
+			return stream.Send(&ListKeysResponse{
+				Hash: v,
+				Key:  k,
+			})
+		})
+	})
+
+	if err == noErrorErr {
+		return nil
+	}
+
+	return err
 }
 
 func (ct *CtlServer) Start(listen string) error {

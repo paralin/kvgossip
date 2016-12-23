@@ -7,7 +7,7 @@ import (
 	"syscall"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/fuserobotics/kvgossip/ctl"
+	"github.com/fuserobotics/kvgossip/ctlserver"
 	"github.com/fuserobotics/kvgossip/db"
 	"github.com/fuserobotics/kvgossip/serf"
 	"github.com/fuserobotics/kvgossip/sync"
@@ -17,7 +17,7 @@ type Agent struct {
 	DB                *db.KVGossipDB
 	SyncManager       *sync.SyncManager
 	SerfManager       *serf.SerfManager
-	ControlServer     *ctl.CtlServer
+	ControlServer     *ctlserver.CtlServer
 	ControlServerPort string
 	SyncServicePort   int
 	RootKey           *rsa.PublicKey
@@ -32,7 +32,7 @@ func NewAgent(dbPath string, syncServicePort int, controlServicePort string, roo
 	res.DB = d
 	res.RootKey = rootKey
 	res.SyncManager = sync.NewSyncManager(d, syncServicePort, rootKey)
-	res.ControlServer = ctl.NewCtlServer(d, rootKey)
+	res.ControlServer = ctlserver.NewCtlServer(d, rootKey)
 	if len(serfRpcAddr) == 0 {
 		log.Info("Disabling serf (no address given).")
 	} else {

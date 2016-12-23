@@ -63,6 +63,20 @@ message SubscribeKeyVerResponse {
   tx.TransactionVerification verification = 1;
 }
 
+message ListKeysRequest {
+  // List of patterns to match.
+  // If prefixed with !, then remove any matches.
+  // Evaluated in order.
+  repeated string filter = 1;
+  // Limit number of keys. If 0, then no limit.
+  uint32 max_keys = 2;
+}
+
+message ListKeysResponse {
+  string key = 1;
+  bytes hash = 2;
+}
+
 service ControlService {
   rpc PutGrant(PutGrantRequest) returns (PutGrantResponse) {}
   rpc PutRevocation(PutRevocationRequest) returns (PutRevocationResponse) {}
@@ -71,4 +85,5 @@ service ControlService {
   rpc GetGrants(GetGrantsRequest) returns (GetGrantsResponse) {}
   rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
   rpc SubscribeKeyVer(SubscribeKeyVerRequest) returns (stream SubscribeKeyVerResponse) {}
+  rpc ListKeys(ListKeysRequest) returns (stream ListKeysResponse) {}
 }

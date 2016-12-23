@@ -55,7 +55,7 @@ func (kvg *KVGossipDB) GetKeyVerification(tx *bolt.Tx, key string) *kvgtx.Transa
 	return res
 }
 
-// Get the verification for a key.
+// Get the verification for all keys.
 func (kvg *KVGossipDB) ForeachKeyVerification(tx *bolt.Tx, fee func(k string, v *kvgtx.TransactionVerification) error) error {
 	bkt := kvg.GetMetaBucket(tx)
 	return bkt.ForEach(func(k, v []byte) error {
