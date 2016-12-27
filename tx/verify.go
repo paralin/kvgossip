@@ -120,6 +120,9 @@ func (trx *Transaction) Validate() error {
 	if trx.Key == "" {
 		return errors.New("Key must be set on transaction.")
 	}
+	if !key.IsValidKey(trx.Key) {
+		return errors.New("Key is not valid.")
+	}
 	if trx.TransactionType != Transaction_TRANSACTION_SET {
 		return errors.New("Only set transactions are supported.")
 	}

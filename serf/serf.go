@@ -2,6 +2,7 @@ package serf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"time"
 
@@ -180,11 +181,37 @@ func (sm *SerfManager) broadcastTreeHash() {
 		log.Warnf("Error sending query: %v", err)
 		return
 	}
-	members, err := sm.serfClient.Members()
+
+	var localNodeId string
+	sts, err := sm.serfClient.Stats()
 	if err != nil {
-		log.Warnf("Fetching members failed, %v", err)
+		log.WithError(err).Warnf("Fetching local node info failed")
 		return
 	}
+	members, err := sm.serfClient.Members()
+	if err == nil {
+		ag, ok := sts["agent"]
+		if !ok {
+			err = errors.New("Agent key not found in stats result.")
+		} else {
+			ni, ok := ag["name"]
+			if !ok {
+				err = errors.New("Agent name not found in stats result.")
+			} else {
+				localNodeId = ni
+			}
+		}
+	}
+	if err != nil {
+		log.WithError(err).Warnf("Fetching members failed")
+		return
+	}
+	ourCoord, err := sm.serfClient.GetCoordinate(localNodeId)
+	if err != nil {
+		log.WithError(err).Warnf("Fetching network coord failed")
+		return
+	}
+
 	for m := range rch {
 		mess := &SerfQueryMessage{}
 		if err := proto.Unmarshal(m.Payload, mess); err != nil || mess.TreeHash == nil {
@@ -206,8 +233,22 @@ func (sm *SerfManager) broadcastTreeHash() {
 			}
 			for _, memb := range members {
 				if memb.Name == m.From {
-					log.Debugf("Queuing sync to %s ip %s from query response.", memb.Name, memb.Addr.String())
-					sm.SyncManager.QueueSync(fmt.Sprintf("%s:%d", memb.Addr.String(), mess.TreeHash.SyncPort), mess.HostNonce)
+					// Determine ping
+					coord, err := sm.serfClient.GetCoordinate(memb.Name)
+					ping := 500
+					if err != nil {
+						log.WithError(err).
+							WithField("node", memb.Name).
+							Warn("Unable to determine ping")
+					} else {
+						ping = int(coord.DistanceTo(ourCoord).Nanoseconds() / 1000000)
+					}
+					log.WithFields(log.Fields{
+						"node": memb.Name,
+						"ping": ping,
+						"ip":   memb.Addr.String(),
+					}).Debugf("Queuing sync")
+					sm.SyncManager.QueueSync(fmt.Sprintf("%s:%d", memb.Addr.String(), mess.TreeHash.SyncPort), mess.HostNonce, ping)
 					break
 				}
 			}

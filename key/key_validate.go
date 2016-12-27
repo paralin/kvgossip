@@ -3,7 +3,10 @@ package key
 import (
 	"errors"
 	"github.com/bmatcuk/doublestar"
+	"regexp"
 )
+
+var ValidKeyRegex = regexp.MustCompile(`^((\/)([a-zA-Z0-9.]+))+$`)
 
 // Check if a pattern is valid.
 func ValidatePattern(pattern string) error {
@@ -22,4 +25,8 @@ func ValidatePattern(pattern string) error {
 func KeyPatternContains(pattern, key string) bool {
 	matched, err := doublestar.Match(pattern, key)
 	return err == nil && matched
+}
+
+func IsValidKey(key string) bool {
+	return ValidKeyRegex.MatchString(key)
 }

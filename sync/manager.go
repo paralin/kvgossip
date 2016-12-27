@@ -10,6 +10,7 @@ import (
 	"github.com/fuserobotics/kvgossip/db"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	lane "gopkg.in/oleiade/lane.v1"
 )
 
 type queuedSync struct {
@@ -32,8 +33,11 @@ type SyncManager struct {
 	sessionIdCounter int
 	sessionsMtx      sync.RWMutex
 
-	rootKey   *rsa.PublicKey
-	syncQueue chan *queuedSync
+	rootKey        *rsa.PublicKey
+	syncQueue      *lane.PQueue
+	syncQueueWake  chan bool
+	syncQueueNonce map[string]bool
+	syncQueueMtx   sync.Mutex
 }
 
 func NewSyncManager(d *db.KVGossipDB, servicePort int, rootKey *rsa.PublicKey) *SyncManager {
@@ -45,7 +49,9 @@ func NewSyncManager(d *db.KVGossipDB, servicePort int, rootKey *rsa.PublicKey) *
 		stopChan:        make(chan bool, 1),
 		SyncServicePort: servicePort,
 		sessions:        make(map[int]*SyncSession),
-		syncQueue:       make(chan *queuedSync, 50),
+		syncQueue:       lane.NewPQueue(lane.MINPQ),
+		syncQueueNonce:  make(map[string]bool),
+		syncQueueWake:   make(chan bool, 1),
 	}
 }
 
@@ -65,7 +71,7 @@ func (sm *SyncManager) SetServerDisabled(disabled bool) {
 	sm.serverDisabled = disabled
 }
 
-func (sm *SyncManager) QueueSync(peer, peernonce string) {
+func (sm *SyncManager) QueueSync(peer, peernonce string, ping int) {
 	if len(peer) == 0 {
 		return
 	}
@@ -74,9 +80,21 @@ func (sm *SyncManager) QueueSync(peer, peernonce string) {
 			return
 		}
 	}
-	sm.syncQueue <- &queuedSync{
+	sm.syncQueueMtx.Lock()
+	defer sm.syncQueueMtx.Unlock()
+
+	if _, ok := sm.syncQueueNonce[peernonce]; ok {
+		return
+	}
+
+	sm.syncQueueNonce[peernonce] = true
+	sm.syncQueue.Push(&queuedSync{
 		Peer:      peer,
 		PeerNonce: peernonce,
+	}, ping)
+	select {
+	case sm.syncQueueWake <- true:
+	default:
 	}
 }
 
@@ -137,18 +155,26 @@ func (sm *SyncManager) syncLoop() {
 		}()
 	}
 
+	ch := make(chan int, 10)
+	sm.Dedupe.ActiveCountChanges(ch)
+
 	for {
-	QueueSelect:
 		select {
 		case <-sm.stopChan:
 			return
-		case queued := <-sm.syncQueue:
-			if len(queued.PeerNonce) != 0 && sm.Dedupe.HasSession(queued.PeerNonce) {
-				break QueueSelect
-			}
-			log.Debugf("Initiating sync session with %s from queue.", queued.Peer)
-			go sm.Connect(queued.Peer)
+		case <-ch:
+		case <-sm.syncQueueWake:
 		}
+
+		if sm.syncQueue.Empty() || sm.Dedupe.Count() > 1 {
+			continue
+		}
+		sm.syncQueueMtx.Lock()
+		deq, _ := sm.syncQueue.Pop()
+		queued := deq.(*queuedSync)
+		delete(sm.syncQueueNonce, queued.PeerNonce)
+		go sm.Connect(queued.Peer)
+		sm.syncQueueMtx.Unlock()
 	}
 }
 

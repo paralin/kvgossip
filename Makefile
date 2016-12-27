@@ -11,6 +11,10 @@ push: docker
 	docker tag fuserobotics/kvgossip:latest registry.fusebot.io/fuserobotics/kvgossip:base
 	docker push registry.fusebot.io/fuserobotics/kvgossip:base
 
+pushl: docker
+	docker tag fuserobotics/kvgossip:latest registry.fusebot.io/fuserobotics/kvgossip:latest
+	docker push registry.fusebot.io/fuserobotics/kvgossip:latest
+
 protogen:
 	protowrap -I $${GOPATH}/src \
 		--go_out=plugins=grpc:$${GOPATH}/src \
