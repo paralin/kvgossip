@@ -6,6 +6,9 @@ import (
 )
 
 func (db *KVGossipDB) ApplyTransaction(trans *tx.Transaction) error {
+	db.applyMutex.Lock()
+	defer db.applyMutex.Unlock()
+
 	// Put all the valid grants
 	for _, grant := range trans.Verification.Grant.SignedGrants {
 		if err := db.PutGrant(grant); err != nil {

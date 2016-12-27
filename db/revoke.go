@@ -49,6 +49,9 @@ func (arc *applyRevocationChecker) GetRevocation(grantData []byte) *dn.SignedDat
 }
 
 func (kvg *KVGossipDB) ApplyRevocation(sd *dn.SignedData, rootKey *rsa.PublicKey) error {
+	kvg.applyMutex.Lock()
+	defer kvg.applyMutex.Unlock()
+
 	if sd.BodyType != dn.SignedData_SIGNED_GRANT_REVOCATION {
 		return NoValidRevocationErr
 	}

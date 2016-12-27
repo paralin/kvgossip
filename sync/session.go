@@ -220,6 +220,9 @@ func (ss *SyncSession) runSyncSession() error {
 
 func (ss *SyncSession) handleIncomingTransaction(sk *SyncKey) (*SyncKeyResult, error) {
 	trans := sk.Transaction
+	if err := trans.Validate(); err != nil {
+		return nil, err
+	}
 	// validate
 	res := tx.VerifyGrantAuthorization(trans, ss.RootKey, ss.DB)
 	syncKeyResult := &SyncKeyResult{
@@ -227,7 +230,10 @@ func (ss *SyncSession) handleIncomingTransaction(sk *SyncKey) (*SyncKeyResult, e
 		UpdatedKey:  trans.Key,
 	}
 	if len(res.Chains) > 0 {
-		log.Debugf("Received valid new value for key %s, timestamp %v.", trans.Key, util.NumberToTime(int64(trans.Verification.Timestamp)))
+		log.WithFields(log.Fields{
+			"key":       trans.Key,
+			"timestamp": util.NumberToTime(int64(trans.Verification.Timestamp)),
+		}).Debug("Received valid new value")
 		if err := ss.DB.ApplyTransaction(trans); err != nil {
 			return nil, err
 		}
@@ -358,7 +364,7 @@ func (ss *SyncSession) handleMessage(msg *SyncSessionMessage) error {
 	skh := msg.SyncKeyHash
 	if len(skh.Key) == 0 {
 		// We now need to send keys that we have locally but not remotely.
-		log.Debug("Sending new keys (foreign %v).", ss.State.RemoteKeyHashes)
+		log.Debugf("Sending new keys (foreign %v).", ss.State.RemoteKeyHashes)
 		err := ss.DB.DB.View(func(readTransaction *bolt.Tx) error {
 			return ss.DB.ForeachKeyHash(readTransaction, func(k string, v []byte) error {
 				if _, ok := ss.State.RemoteKeyHashes[k]; ok {

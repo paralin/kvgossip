@@ -20,6 +20,8 @@ type KVGossipDB struct {
 	closeOnce          sync.Once
 	closeSubscriptions chan bool
 	lastCloseError     error
+
+	applyMutex sync.Mutex
 }
 
 func OpenDB(dbPath string) (*KVGossipDB, error) {
@@ -35,6 +37,10 @@ func OpenDB(dbPath string) (*KVGossipDB, error) {
 	res.closeSubscriptions = make(chan bool, 1)
 	res.ensureBuckets()
 	res.ensureTreeHash()
+
+	res.DB.Update(func(tx *bolt.Tx) error {
+		return res.UpdateOverallHash(tx)
+	})
 
 	go res.handleSubscriptions()
 
