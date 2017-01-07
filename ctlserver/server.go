@@ -207,17 +207,44 @@ func (ct *CtlServer) ListKeys(req *ListKeysRequest, stream ControlService_ListKe
 
 			nk++
 			return stream.Send(&ListKeysResponse{
-				Hash: v,
-				Key:  k,
+				Hash:  v,
+				Key:   k,
+				State: ListKeysResponse_LIST_KEYS_INITIAL_SET,
 			})
 		})
 	})
 
 	if err == noErrorErr {
-		return nil
+		err = nil
+	}
+	if err == nil && req.Watch {
+		err = stream.Send(&ListKeysResponse{
+			State: ListKeysResponse_LIST_KEYS_TAIL,
+		})
+	}
+	if err != nil || !req.Watch {
+		return err
 	}
 
-	return err
+	lsub := ct.DB.SubscribeKeyPattern(req.Filter)
+	defer lsub.Unsubscribe()
+	ch := make(chan *tx.Transaction, 10)
+	lsub.Changes(ch)
+
+	// Note: tailed keys will NOT have hash as an optimization.
+	for {
+		select {
+		case <-done:
+			return nil
+		case next := <-ch:
+			if err := stream.Send(&ListKeysResponse{
+				Key:   next.Key,
+				State: ListKeysResponse_LIST_KEYS_TAIL,
+			}); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (ct *CtlServer) Start(listen string) error {

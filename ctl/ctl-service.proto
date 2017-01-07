@@ -70,11 +70,19 @@ message ListKeysRequest {
   repeated string filter = 1;
   // Limit number of keys. If 0, then no limit.
   uint32 max_keys = 2;
+  // Watch for new keys.
+  bool watch = 3;
 }
 
 message ListKeysResponse {
   string key = 1;
   bytes hash = 2;
+
+  ListKeysResponseState state = 3;
+  enum ListKeysResponseState {
+    LIST_KEYS_INITIAL_SET = 0;
+    LIST_KEYS_TAIL = 1;
+  }
 }
 
 service ControlService {

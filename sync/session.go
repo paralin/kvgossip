@@ -142,7 +142,7 @@ func (ss *SyncSession) runSyncSession() error {
 			return err
 		}
 		if msg.SyncKeyHash != nil {
-			break
+			continue
 		} else if msg.SyncKey != nil {
 			if msg.SyncKey.RequestKey != lk.Key {
 				return errors.New("Request key did not match last sent key hash.")
