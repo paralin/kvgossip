@@ -171,8 +171,12 @@ func (ct *CtlServer) SubscribeKeyVer(req *SubscribeKeyVerRequest, stream Control
 			if !ok {
 				return nil
 			}
+			var verif *tx.TransactionVerification
+			if trans != nil {
+				verif = trans.Verification
+			}
 			err := stream.Send(&SubscribeKeyVerResponse{
-				Verification: trans.Verification,
+				Verification: verif,
 			})
 			if err != nil {
 				return err
