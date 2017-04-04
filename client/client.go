@@ -3,6 +3,7 @@ package client
 import (
 	"sync"
 
+	"github.com/fuserobotics/kvgossip/ctl"
 	"google.golang.org/grpc"
 )
 
@@ -30,6 +31,17 @@ func (c *Client) applyConnection(nconn *Connection) {
 	}
 	c.interestMtx.Unlock()
 	c.connMtx.RUnlock()
+}
+
+func (c *Client) GetConnections() []ctl.ControlServiceClient {
+	c.connMtx.RLock()
+	defer c.connMtx.RUnlock()
+
+	var result []ctl.ControlServiceClient
+	for _, conn := range c.connections {
+		result = append(result, conn.stub)
+	}
+	return result
 }
 
 func (c *Client) AddConnection(conn *grpc.ClientConn) *Connection {
