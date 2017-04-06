@@ -8,16 +8,22 @@ import (
 	"github.com/fuserobotics/kvgossip/tx"
 )
 
+type KeySubscriptionEvent struct {
+	Key         string
+	Transaction *tx.Transaction
+	UpdatedHash []byte
+}
+
 type KeySubscription struct {
 	db         *KVGossipDB
 	key        string
 	keyPattern []string
 	disposed   bool
 
-	lastVal   *tx.Transaction
+	lastVal   *KeySubscriptionEvent
 	subMtx    sync.Mutex
 	unsubOnce sync.Once
-	chans     []chan<- *tx.Transaction
+	chans     []chan<- *KeySubscriptionEvent
 }
 
 func (ks *KeySubscription) Unsubscribe() {
@@ -33,7 +39,7 @@ func (ks *KeySubscription) Unsubscribe() {
 	})
 }
 
-func (ks *KeySubscription) Value() *tx.Transaction {
+func (ks *KeySubscription) Value() *KeySubscriptionEvent {
 	if ks.key == "list" {
 		return nil
 	}
@@ -44,7 +50,7 @@ func (ks *KeySubscription) Value() *tx.Transaction {
 	return ks.lastVal
 }
 
-func (ks *KeySubscription) Changes(ch chan<- *tx.Transaction) {
+func (ks *KeySubscription) Changes(ch chan<- *KeySubscriptionEvent) {
 	ks.subMtx.Lock()
 	defer ks.subMtx.Unlock()
 
@@ -67,9 +73,11 @@ func (db *KVGossipDB) SubscribeKey(key string) *KeySubscription {
 		return nil
 	}
 
-	var lastVal *tx.Transaction
+	lastVal := &KeySubscriptionEvent{}
 	db.DB.View(func(t *bolt.Tx) error {
-		lastVal = db.GetTransaction(t, key)
+		lastVal.Key = lastVal.Transaction.Key
+		lastVal.Transaction = db.GetTransaction(t, key)
+		lastVal.UpdatedHash = db.GetKeyHash(t, key)
 		return nil
 	})
 	ks := &KeySubscription{
@@ -91,10 +99,10 @@ func (db *KVGossipDB) SubscribeKeyPattern(keyPattern []string) *KeySubscription 
 	return ks
 }
 
-func (ks *KeySubscription) next(trans *tx.Transaction) {
+func (ks *KeySubscription) next(trans *KeySubscriptionEvent) {
 	ks.subMtx.Lock()
 	for _, pat := range ks.keyPattern {
-		if !kkey.KeyPatternContains(pat, trans.Key) {
+		if !kkey.KeyPatternContains(pat, trans.Transaction.Key) {
 			return
 		}
 	}

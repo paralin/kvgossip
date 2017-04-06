@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/fuserobotics/kvgossip/tx"
 )
 
 // BoltDB backed database for KVGossip.
@@ -13,7 +12,7 @@ type KVGossipDB struct {
 	DB              *bolt.DB
 	TreeHashChanged chan []byte
 
-	keyChanged         chan *tx.Transaction
+	keyChanged         chan *KeySubscriptionEvent
 	keySubscriptions   map[string][]*KeySubscription
 	keySubscriptionMtx sync.Mutex
 
@@ -32,7 +31,7 @@ func OpenDB(dbPath string) (*KVGossipDB, error) {
 	}
 	res.DB = db
 	res.TreeHashChanged = make(chan []byte, 10)
-	res.keyChanged = make(chan *tx.Transaction, 10)
+	res.keyChanged = make(chan *KeySubscriptionEvent, 10)
 	res.keySubscriptions = make(map[string][]*KeySubscription)
 	res.closeSubscriptions = make(chan bool, 1)
 	res.ensureBuckets()

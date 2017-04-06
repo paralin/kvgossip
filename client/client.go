@@ -14,6 +14,9 @@ type Client struct {
 
 	interests   map[string]*interest
 	interestMtx sync.Mutex
+
+	listInterest    *listInterest
+	listInterestMtx sync.Mutex
 }
 
 func NewClient() *Client {
@@ -98,6 +101,40 @@ func (c *Client) SubscribeKey(key string) *KeySubscription {
 			interest.dispose()
 		}
 		c.interestMtx.Unlock()
+	})
+	return nsub
+}
+
+func (c *Client) SubscribeKeyList() *KeyListSubscription {
+	c.listInterestMtx.Lock()
+	defer c.listInterestMtx.Unlock()
+
+	listInterest := c.listInterest
+	if listInterest == nil {
+		listInterest = newListInterest()
+		c.listInterest = listInterest
+		go listInterest.updateLoop()
+
+		c.connMtx.RLock()
+		for _, conn := range c.connections {
+			listInterest.addConnection(conn)
+		}
+		c.connMtx.RUnlock()
+	}
+
+	listInterest.stateMtx.RLock()
+	nsub := newKeyListSubscription(c, listInterest)
+	listInterest.stateMtx.RUnlock()
+
+	listInterest.addSubscription(nsub)
+	nsub.OnDisposed(func(*KeyListSubscription) {
+		c.listInterestMtx.Lock()
+		listInterest.removeSubscription(nsub)
+		if len(listInterest.subscriptions) == 0 {
+			listInterest.dispose()
+			c.listInterest = nil
+		}
+		c.listInterestMtx.Unlock()
 	})
 	return nsub
 }

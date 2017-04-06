@@ -33,6 +33,8 @@ message SyncKeyResult {
   repeated data.SignedData revocations = 1;
   // Otherwise, just echo back the key.
   string updated_key = 2;
+  // Additionally, if we still disagree (in the event of a deleted key) send the tx.
+  tx.Transaction delete_transaction = 3;
 }
 
 // A message in a sync session conversation.

@@ -12,6 +12,8 @@ import (
 
 var TreeHashKeyName []byte = []byte("treeHash")
 
+// var EmptyHash []byte = hashKeyData([]byte{})
+
 func (kvg *KVGossipDB) GetKeyHash(tx *bolt.Tx, key string) []byte {
 	bkt := kvg.GetDataHashBucket(tx)
 	data := bkt.Get([]byte(key))
@@ -20,11 +22,20 @@ func (kvg *KVGossipDB) GetKeyHash(tx *bolt.Tx, key string) []byte {
 	return data
 }
 
+func hashKeyData(data []byte) []byte {
+	hash := sha256.Sum256(data)
+	return hash[:]
+}
+
 // Update the key hash for a key.
-func (kvg *KVGossipDB) UpdateKeyHash(tx *bolt.Tx, key string, keyData []byte) error {
-	hash := sha256.Sum256(keyData)
+func (kvg *KVGossipDB) UpdateKeyHash(tx *bolt.Tx, key string, keyData []byte) ([]byte, error) {
 	bkt := kvg.GetDataHashBucket(tx)
-	return bkt.Put([]byte(key), hash[:])
+
+	var hashSlice []byte
+	if len(keyData) > 0 {
+		hashSlice = hashKeyData(keyData)
+	}
+	return hashSlice, bkt.Put([]byte(key), hashSlice)
 }
 
 func (kvg *KVGossipDB) GetOverallHash() []byte {

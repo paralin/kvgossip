@@ -113,8 +113,13 @@ func (ss *SyncSession) runSyncSession() error {
 
 	// Iterate through our local keys and attempt to compare them.
 	err = ss.DB.DB.View(func(readTransaction *bolt.Tx) error {
-		return ss.DB.ForeachKeyVerification(readTransaction, func(k string, v *tx.TransactionVerification) error {
-			hash := ss.DB.GetKeyHash(readTransaction, k)
+		return ss.DB.ForeachKeyHash(readTransaction, func(k string, hash []byte) error {
+			// If the key is deleted (tombstone) initially ignore it.
+			// It will be cleaned up later.
+			if len(hash) == 0 {
+				return nil
+			}
+			v := ss.DB.GetKeyVerification(readTransaction, k)
 			localData = append(localData, &localKeyData{
 				Hash:         hash,
 				Key:          k,
@@ -155,6 +160,7 @@ func (ss *SyncSession) runSyncSession() error {
 				if err != nil {
 					return err
 				}
+
 				if trans.Key != lk.Key {
 					return errors.New("Key mismatch in SyncKey body.")
 				}
@@ -230,10 +236,36 @@ func (ss *SyncSession) handleIncomingTransaction(sk *SyncKey) (*SyncKeyResult, e
 		UpdatedKey:  trans.Key,
 	}
 	if len(res.Chains) > 0 {
+		// Verify the timestamp is newer.
+		var oldTx *tx.TransactionVerification
+		ntimestamp := util.NumberToTime(int64(trans.Verification.Timestamp))
+		err := ss.DB.DB.View(func(t *bolt.Tx) error {
+			oldTx = ss.DB.GetKeyVerification(t, trans.Key)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if oldTx != nil {
+			if trans.Verification.Timestamp <= oldTx.Timestamp {
+				err := ss.DB.DB.View(func(t *bolt.Tx) error {
+					syncKeyResult.DeleteTransaction = ss.DB.GetTransaction(t, trans.Key)
+					if syncKeyResult.DeleteTransaction == nil {
+						return errors.New("desync while sending delete transaction")
+					}
+					return nil
+				})
+				if err != nil {
+					return nil, err
+				}
+				return syncKeyResult, nil
+			}
+		}
+
 		log.WithFields(log.Fields{
 			"key":       trans.Key,
-			"timestamp": util.NumberToTime(int64(trans.Verification.Timestamp)),
-		}).Debug("Received valid new value")
+			"timestamp": ntimestamp,
+		}).Debug("Received valid value")
 		if err := ss.DB.ApplyTransaction(trans); err != nil {
 			return nil, err
 		}
@@ -277,6 +309,17 @@ func (ss *SyncSession) sendKeyTransaction(key string) error {
 		log.Debugf("Applying revocation %d/%d from peer...", i+1, numRev)
 		if err := ss.DB.ApplyRevocation(revocation, ss.RootKey); err != nil {
 			return err
+		}
+	}
+	if msg.SyncKeyResult.DeleteTransaction != nil {
+		le := log.WithField("key", key)
+		le.Debug("Peer sent delete transaction")
+		_, err := ss.handleIncomingTransaction(&SyncKey{
+			RequestKey:  key,
+			Transaction: msg.SyncKeyResult.DeleteTransaction,
+		})
+		if err != nil {
+			le.WithError(err).Warn("Delete transaction invalid")
 		}
 	}
 	return nil
@@ -364,7 +407,7 @@ func (ss *SyncSession) handleMessage(msg *SyncSessionMessage) error {
 	skh := msg.SyncKeyHash
 	if len(skh.Key) == 0 {
 		// We now need to send keys that we have locally but not remotely.
-		log.Debugf("Sending new keys (foreign %v).", ss.State.RemoteKeyHashes)
+		log.Debugf("Sending any new keys")
 		err := ss.DB.DB.View(func(readTransaction *bolt.Tx) error {
 			return ss.DB.ForeachKeyHash(readTransaction, func(k string, v []byte) error {
 				if _, ok := ss.State.RemoteKeyHashes[k]; ok {

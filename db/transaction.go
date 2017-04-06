@@ -15,10 +15,14 @@ func (db *KVGossipDB) ApplyTransaction(trans *tx.Transaction) error {
 			return err
 		}
 	}
+
+	var updatedHash []byte
 	err := db.DB.Update(func(tx *bolt.Tx) error {
 		// Update key hash
-		if err := db.UpdateKeyHash(tx, trans.Key, trans.Value); err != nil {
+		if nhash, err := db.UpdateKeyHash(tx, trans.Key, trans.Value); err != nil {
 			return err
+		} else {
+			updatedHash = nhash
 		}
 		// Update value
 		if err := db.UpdateKeyData(tx, trans.Key, trans.Value); err != nil {
@@ -39,6 +43,10 @@ func (db *KVGossipDB) ApplyTransaction(trans *tx.Transaction) error {
 	if err != nil {
 		return err
 	}
-	db.keyChanged <- trans
+	db.keyChanged <- &KeySubscriptionEvent{
+		Key:         trans.Key,
+		UpdatedHash: updatedHash,
+		Transaction: trans,
+	}
 	return nil
 }

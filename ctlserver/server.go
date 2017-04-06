@@ -160,7 +160,7 @@ func (ct *CtlServer) SubscribeKeyVer(req *SubscribeKeyVerRequest, stream Control
 	ks := ct.DB.SubscribeKey(req.Key)
 	defer ks.Unsubscribe()
 
-	ch := make(chan *tx.Transaction, 5)
+	ch := make(chan *db.KeySubscriptionEvent, 5)
 	ks.Changes(ch)
 
 	ctx := stream.Context()
@@ -173,7 +173,7 @@ func (ct *CtlServer) SubscribeKeyVer(req *SubscribeKeyVerRequest, stream Control
 			}
 			var verif *tx.TransactionVerification
 			if trans != nil {
-				verif = trans.Verification
+				verif = trans.Transaction.Verification
 			}
 			err := stream.Send(&SubscribeKeyVerResponse{
 				Verification: verif,
@@ -209,6 +209,10 @@ func (ct *CtlServer) ListKeys(req *ListKeysRequest, stream ControlService_ListKe
 				return nil
 			}
 
+			if len(v) == 0 {
+				return nil
+			}
+
 			nk++
 			return stream.Send(&ListKeysResponse{
 				Hash:  v,
@@ -217,7 +221,6 @@ func (ct *CtlServer) ListKeys(req *ListKeysRequest, stream ControlService_ListKe
 			})
 		})
 	})
-
 	if err == noErrorErr {
 		err = nil
 	}
@@ -232,10 +235,9 @@ func (ct *CtlServer) ListKeys(req *ListKeysRequest, stream ControlService_ListKe
 
 	lsub := ct.DB.SubscribeKeyPattern(req.Filter)
 	defer lsub.Unsubscribe()
-	ch := make(chan *tx.Transaction, 10)
+	ch := make(chan *db.KeySubscriptionEvent, 10)
 	lsub.Changes(ch)
 
-	// Note: tailed keys will NOT have hash as an optimization.
 	for {
 		select {
 		case <-done:
@@ -243,6 +245,7 @@ func (ct *CtlServer) ListKeys(req *ListKeysRequest, stream ControlService_ListKe
 		case next := <-ch:
 			if err := stream.Send(&ListKeysResponse{
 				Key:   next.Key,
+				Hash:  next.UpdatedHash,
 				State: ListKeysResponse_LIST_KEYS_TAIL,
 			}); err != nil {
 				return err

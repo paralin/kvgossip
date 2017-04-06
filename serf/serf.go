@@ -24,6 +24,7 @@ type SerfManager struct {
 	serfStreamHandle client.StreamHandle
 	serfClient       *client.RPCClient
 	bthInProgress    bool
+	lastTreeHash     []byte
 }
 
 func NewSerfManager(sm *sync.SyncManager, serfRpc string) *SerfManager {
@@ -153,10 +154,16 @@ func (sm *SerfManager) broadcastTreeHash() {
 		return
 	}
 	sm.bthInProgress = true
+	sm.lastTreeHash = sm.TreeHash
 	log.Debug("Initiating tree hash sweep.")
 	defer func() {
 		sm.bthInProgress = false
-		log.Debug("Completed tree hash sweep.")
+		if bytes.Compare(sm.TreeHash, sm.lastTreeHash) != 0 {
+			log.Debug("Restarting tree hash sweep.")
+			go sm.broadcastTreeHash()
+		} else {
+			log.Debug("Completed tree hash sweep.")
+		}
 	}()
 	msg := &SerfQueryMessage{
 		TreeHash: &SerfTreeHashBroadcast{
