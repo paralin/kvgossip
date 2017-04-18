@@ -75,7 +75,7 @@ func (db *KVGossipDB) SubscribeKey(key string) *KeySubscription {
 
 	lastVal := &KeySubscriptionEvent{}
 	db.DB.View(func(t *bolt.Tx) error {
-		lastVal.Key = lastVal.Transaction.Key
+		lastVal.Key = key
 		lastVal.Transaction = db.GetTransaction(t, key)
 		lastVal.UpdatedHash = db.GetKeyHash(t, key)
 		return nil

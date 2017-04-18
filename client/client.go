@@ -33,6 +33,11 @@ func (c *Client) applyConnection(nconn *Connection) {
 		interest.addConnection(nconn)
 	}
 	c.interestMtx.Unlock()
+	c.listInterestMtx.Lock()
+	if c.listInterest != nil {
+		c.listInterest.addConnection(nconn)
+	}
+	c.listInterestMtx.Unlock()
 	c.connMtx.RUnlock()
 }
 

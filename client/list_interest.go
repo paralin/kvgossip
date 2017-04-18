@@ -64,10 +64,8 @@ func (in *listInterest) removeSubscription(ks *KeyListSubscription) {
 }
 
 func (in *listInterest) nextEvent(event *KeyListSubscriptionEvent) {
-	in.stateMtx.Lock()
 	in.subscriptionMtx.RLock()
 	defer in.subscriptionMtx.RUnlock()
-	defer in.stateMtx.Unlock()
 
 	for _, sub := range in.subscriptions {
 		sub.next(event)

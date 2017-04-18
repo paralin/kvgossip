@@ -161,7 +161,7 @@ func (ct *CtlServer) SubscribeKeyVer(req *SubscribeKeyVerRequest, stream Control
 	defer ks.Unsubscribe()
 
 	ch := make(chan *db.KeySubscriptionEvent, 5)
-	ks.Changes(ch)
+	go ks.Changes(ch)
 
 	ctx := stream.Context()
 
@@ -172,7 +172,7 @@ func (ct *CtlServer) SubscribeKeyVer(req *SubscribeKeyVerRequest, stream Control
 				return nil
 			}
 			var verif *tx.TransactionVerification
-			if trans != nil {
+			if trans != nil && trans.Transaction != nil {
 				verif = trans.Transaction.Verification
 			}
 			err := stream.Send(&SubscribeKeyVerResponse{
