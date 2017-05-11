@@ -1,6 +1,6 @@
 FROM container4armhf/armhf-alpine:edge
-ADD ./kvgossip ./dumb-init /
-RUN chmod +x /kvgossip /dumb-init
+ADD ./kvgossip /
+RUN chmod +x /kvgossip
 VOLUME ["/data"]
-ENTRYPOINT ["/dumb-init"]
-CMD ["/kvgossip", "--dbpath", "/data/kvgossip.db", "--rootkey", "/data/root_pub.pem", "agent"]
+ENTRYPOINT ["/kvgossip"]
+CMD ["--dbpath", "/data/kvgossip.db", "--rootkey", "/data/root_pub.pem", "agent"]

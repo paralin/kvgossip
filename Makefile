@@ -1,12 +1,9 @@
 gengo: protogen install-go
 
-dumb-init:
-	wget https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64 -O dumb-init
-
 buildarm:
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 go build -v -a -o kvgossip ./cmd/kvgossip
 
-docker: dumb-init
+docker:
 	CGO_ENABLED=0 go build -v -o kvgossip ./cmd/kvgossip
 	docker build -t "fuserobotics/kvgossip:latest" .
 
